@@ -5,9 +5,9 @@ Guidance for Claude Code (and human contributors) working in this repository.
 ## What this is
 
 `yfp.nvim` (**Y**ank **F**ile **P**ath) is a **floating, read-only file browser** for Neovim. Its
-single purpose: let the user browse the filesystem from a float and press `y` on a file/folder to
-drop that path **both** into the buffer they came from (at the cursor) **and** into registers —
-always normalized to forward slashes (`/`), even on Windows.
+single purpose: let the user browse the filesystem from a float and press `p` on a file/folder to
+drop that path **both** into the buffer they came from (at the cursor) **and** into registers (or `y`
+for registers only) — always normalized to forward slashes (`/`), even on Windows.
 
 It is **standalone and zero-dependency** (pure Neovim stdlib). Full rationale and the locked design
 decisions are in [DESIGN.md](./DESIGN.md); the user-facing docs are in [README.md](./README.md).
@@ -42,8 +42,8 @@ lua/yfp/
   config.lua     Default options + deep-merge of user opts. Type annotations (---@class yfp.Config).
   explorer.lua   Float window + scratch buffer lifecycle; render; cursor; buffer-local keymaps;
                  captures origin (win/buf/cursor/mode) at open. NO filesystem writes.
-  actions.lua    Handlers: yank (insert + registers), enter_dir, up, goto_path, drives,
-                 toggle_hidden, close. Delegates all reads to fs.lua.
+  actions.lua    Handlers: yank (registers), yank_and_paste (paste + registers), yank_menu, enter,
+                 up, goto_path, drives, toggle_hidden. Delegates all reads to fs.lua.
   fs.lua         THE ONLY module that calls vim.uv — read-only functions only.
   path.lua       Pure functions: join, slash-normalize, relative-to-{cwd,buffer,git,custom}.
 plugin/yfp.lua   Defines :YFP, guards double-load (vim.g.loaded_yfp).
@@ -55,12 +55,14 @@ State shape and flows are documented in DESIGN.md §6–§7. Key fields: `cwd`, 
 
 ## The yank flow (most important code path)
 
-`y` must, in order: resolve the entry's absolute path → apply the configured path mode → **then**
-`gsub("\\","/")` → set each register in `cfg.yank.registers` → close the float (restoring focus to
-`origin_win`) → if `cfg.yank.insert` and the origin buffer is valid+modifiable, insert via
-`nvim_buf_set_text(origin_buf, row, col, row, col, { out })` and move the cursor to `col + #out`.
-If the origin buffer isn't writable, skip the insert, keep the registers, and `notify`. The `../`
-pseudo-row is never yankable. See DESIGN.md §7.3 for the reference pseudocode.
+Both yank keys share one worker, `do_yank(mode, insert)` in `actions.lua`: `y` → `insert=false`
+(registers only), `p` → `insert=true` (registers + paste). It must, in order: resolve the entry's
+absolute path → apply the configured path mode → **then** `gsub("\\","/")` → set each register in
+`cfg.yank.registers` → close the float (restoring focus to `origin_win`) → if `insert` and the origin
+buffer is valid+modifiable, paste via `nvim_buf_set_text(origin_buf, row, col, row, col, { out })`
+and move the cursor to `col + #out`. If the origin buffer isn't writable, skip the paste, keep the
+registers, and `notify`. The `../` pseudo-row is never yankable. See DESIGN.md §7.3 for the reference
+pseudocode.
 
 ## Local development
 
@@ -109,7 +111,8 @@ There is no build step — it's Lua loaded by Neovim.
 
 - **2026-06-17** — Standalone, zero-dependency over a snacks layer (read-only by construction + clean
   public repo win over getting find/grep "for free").
-- **2026-06-17** — `y` does **both**: insert at cursor *and* set `{'"','+'}` registers.
+- **2026-06-17** — Two yank keys: `y` = registers only (Vim-like), `p` = registers + paste. (Split
+  from an earlier single `y`=both during keymap tuning; removed the redundant `yank.insert` flag.)
 - **2026-06-17** — Output slash handling is an explicit final `gsub("\\","/")`, not
   `vim.fs.normalize` (stay literal; avoid `~`/`$VAR`/`..` surprises).
 

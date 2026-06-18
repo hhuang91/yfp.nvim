@@ -43,12 +43,15 @@ eq(type(config.options.window), "table", "setup({}) keeps window defaults")
 eq(config.options.window.width, 0.7, "setup({}) keeps nested window default")
 eq(#config.options.yank.registers, 2, "setup({}) keeps default registers")
 eq(config.options.yank.default_mode, "absolute", "setup({}) keeps yank defaults")
+eq(config.options.keymaps.yank, "y", "default yank key")
+eq(config.options.keymaps.yank_and_paste, "p", "default yank_and_paste key")
+eq(config.options.keymaps.drives, "D", "default drives key")
 
 -- list options replace wholesale rather than index-merge
 config.setup({ yank = { registers = { "+" } } })
 eq(#config.options.yank.registers, 1, "registers replaced, not merged")
 eq(config.options.yank.registers[1], "+", "registers value")
-eq(config.options.yank.insert, true, "sibling defaults preserved")
+eq(config.options.yank.keep_insert, true, "sibling defaults preserved")
 
 -- an explicit empty list still clears (e.g. disable registers)
 config.setup({ yank = { registers = {} } })

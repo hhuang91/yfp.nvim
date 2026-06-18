@@ -37,10 +37,16 @@ function M.set_source_dir(dir)
   require("yfp.config").options.source_dir = dir
 end
 
---- Programmatic yank of the entry under the cursor (only valid while open).
+--- Programmatic yank of the entry under the cursor to registers (only valid while open).
 ---@param mode string|nil
 function M.yank_under_cursor(mode)
   require("yfp.actions").yank(mode or "default")
+end
+
+--- Programmatic yank-and-paste of the entry under the cursor (only valid while open).
+---@param mode string|nil
+function M.yank_and_paste_under_cursor(mode)
+  require("yfp.actions").yank_and_paste(mode or "default")
 end
 
 return M

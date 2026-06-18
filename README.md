@@ -5,7 +5,7 @@
 > even on Windows.
 
 No more *Alt-tab → Explorer → right-click "Copy as path" → paste → fix the backslashes*. Open a
-float, move with the keyboard, press `y`. Done.
+float, move with the keyboard, press `p`. Done.
 
 <!-- TODO: drop a demo GIF here once recorded -->
 <!-- ![demo](./assets/demo.gif) -->
@@ -21,7 +21,7 @@ backslashes for anything else. `yfp` fixes the whole loop without leaving the ke
 | Before | With `yfp` |
 |---|---|
 | Open Explorer, find the file, right-click → *Copy as path* | `<leader>fy` opens a float |
-| Alt-tab back, paste | Navigate with `j`/`k`/`l`/`h`, press `y` |
+| Alt-tab back, paste | Navigate with `j`/`k`/`l`/`h`, press `p` |
 | Hand-fix every `\` → `/` | Already `/`, dropped at your cursor **and** in your clipboard |
 
 ---
@@ -33,8 +33,8 @@ backslashes for anything else. `yfp` fixes the whole loop without leaving the ke
   (`D:/`, UNC shares) without leaving the float.
 - 🔒 **Strictly read-only — by construction.** `yfp` *cannot* create, rename, move, delete, or chmod
   anything. It only ever calls read-only filesystem APIs, and a CI test enforces it. Safe to poke at.
-- 📋 **One job, done well:** press `y` on a file/folder and its full path is **both** inserted at your
-  cursor **and** copied to your registers (`"` and `+`) — always normalized to `/`.
+- 📋 **One job, done well:** press `p` on a file/folder to **paste** its path at your cursor *and*
+  set the `"`/`+` registers, or `y` to set the registers only (Vim-style) — always `/`-normalized.
 - 🧩 **Zero dependencies.** No telescope, no snacks, no plenary. Pure Neovim stdlib.
 - ⌨️ **Keyboard-only.** The mouse stays untouched.
 
@@ -86,9 +86,10 @@ Clone, then point lazy.nvim at the local copy:
 
 1. `<leader>fy` (or `:YFP`) opens the float at the directory of the current file.
 2. Move: `j`/`k` to move, `l`/`<CR>` to enter a folder, `h`/`-` to go up.
-3. Jump elsewhere: `<C-g>` to type any path (e.g. `D:/projects`), `<C-d>` to list drives (Windows).
-4. Press **`y`** on a file or folder. The float closes, the `/`-normalized path appears at your
-   cursor, and it's in your `"`/`+` registers too.
+3. Jump elsewhere: `<C-g>` to type any path (e.g. `D:/projects`), `D` to list drives (Windows).
+4. Press **`p`** ("paste the path") on a file or folder. The float closes, the `/`-normalized path
+   appears at your cursor and is set in your `"`/`+` registers. (Or **`y`** to set the registers
+   only, Vim-style — no paste.)
 
 ---
 
@@ -96,13 +97,13 @@ Clone, then point lazy.nvim at the local copy:
 
 | Key | Action |
 |---|---|
-| `y` | **Yank** path → insert at cursor **and** set registers (`"`, `+`) |
-| `Y` | Yank to registers only (no insert) |
-| `gy` | Pick a path format (absolute / relative…) then yank |
+| `y` | **Yank** path to registers (`"`, `+`) — Vim-style, no paste |
+| `p` | **Yank and paste** the path at your cursor (also sets registers) |
+| `gy` | Pick a path format (absolute / relative…) then yank-and-paste |
 | `<CR>` / `l` | Enter directory |
 | `-` / `h` | Go up (drives view at a drive root) |
 | `<C-g>` | Go to a typed path (any folder / drive / `~`) |
-| `<C-d>` | List drives (Windows) |
+| `D` | List drives (Windows) |
 | `~` | Jump to home |
 | `=` | Jump to original working directory |
 | `.` | Toggle hidden files |
@@ -110,7 +111,8 @@ Clone, then point lazy.nvim at the local copy:
 | `q` / `<Esc>` | Close |
 | `g?` | Help |
 
-All keys are remappable — see `keymaps` in Configuration.
+`<C-d>` / `<C-u>` keep their native half-page scroll inside the float. All keys are remappable — see
+`keymaps` in Configuration.
 
 ---
 
@@ -137,9 +139,8 @@ require("yfp").setup({
 
   yank = {
     separator = "/",           -- "/" force forward slashes | "\\" | "os" (native)
-    insert = true,             -- insert at cursor in the buffer you came from
-    registers = { '"', '+' },  -- also copy to these registers
-    insert_position = "at_cursor",  -- "at_cursor" | "after_cursor"
+    registers = { '"', '+' },  -- registers set by BOTH yank actions
+    insert_position = "after_cursor",  -- "at_cursor" | "after_cursor" (paste action)
     keep_insert = true,        -- re-enter insert mode if opened from insert mode
     dir_trailing_slash = false,
     default_mode = "absolute", -- "absolute" | "relative_cwd" | "relative_buffer"
@@ -151,19 +152,19 @@ require("yfp").setup({
   icons = { enabled = true },  -- uses mini.icons / nvim-web-devicons if present; text fallback else
 
   keymaps = {
-    yank          = "y",
-    yank_register = "Y",
-    yank_menu     = "gy",
-    enter         = { "<CR>", "l" },
-    up            = { "-", "h" },
-    goto_path     = "<C-g>",
-    drives        = "<C-d>",
-    home          = "~",
-    cwd           = "=",
-    toggle_hidden = ".",
-    filter        = "/",
-    close         = { "q", "<Esc>" },
-    help          = "g?",
+    yank           = "y",   -- registers only (Vim-like)
+    yank_and_paste = "p",   -- insert at the cursor + set registers
+    yank_menu      = "gy",
+    enter          = { "<CR>", "l" },
+    up             = { "-", "h" },
+    goto_path      = "<C-g>",
+    drives         = "D",
+    home           = "~",
+    cwd            = "=",
+    toggle_hidden  = ".",
+    filter         = "/",
+    close          = { "q", "<Esc>" },
+    help           = "g?",
   },
 })
 ```
@@ -230,13 +231,13 @@ it inserts, leaving the rest of your file untouched.
 No — by design. It's a *path* picker, not a file manager. That keeps it minimal and guarantees it
 can't modify anything.
 
-**Does `y` overwrite my clipboard?**
-It sets the `"` and `+` registers by default (configurable via `yank.registers`). Set it to `{}` to
-insert-only, or to `{ '"' }` to leave the system clipboard alone.
+**Do the yank keys overwrite my clipboard?**
+Both `y` and `p` set the `"` and `+` registers by default (configurable via `yank.registers`). Set
+it to `{ '"' }` to leave the system clipboard alone, or `{}` so only `p`'s paste happens.
 
-**It inserted in the wrong place / not in insert mode.**
-`yfp` captures your cursor position the moment it opens and inserts there. Tune with
-`yank.insert_position` and `yank.keep_insert`.
+**`p` pasted in the wrong place / not in insert mode.**
+`yfp` captures your cursor position the moment it opens and pastes there. Tune with
+`yank.insert_position` (`at_cursor` vs `after_cursor`) and `yank.keep_insert`.
 
 ---
 

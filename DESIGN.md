@@ -15,7 +15,7 @@ Inserting a real filesystem path into the buffer you're editing is needlessly pa
 3. The pasted path uses `\`, so you hand-fix every separator (and a blind `:%s/\\/\//g` is unsafe
    when the buffer legitimately contains backslashes for other reasons).
 
-`yfp` collapses all three steps into: open a float, navigate with the keyboard, press `y`. The path
+`yfp` collapses all three steps into: open a float, navigate with the keyboard, press `p`. The path
 lands at your cursor with `/` separators and is also copied to your registers — no mouse, no manual
 slash surgery, no leaving the keyboard.
 
@@ -28,8 +28,8 @@ slash surgery, no leaving the keyboard.
   root — including other drives (`D:/`, UNC shares) on Windows.
 - **Strictly read-only.** The plugin must be *incapable* of modifying the filesystem, by
   construction (not merely by disabling commands).
-- **One core action:** press `y` on a file or folder → its full path goes **both** into the origin
-  buffer at the cursor **and** into registers, always normalized to `/`.
+- **Core action:** press `p` on a file or folder → its full path goes **both** into the origin
+  buffer at the cursor **and** into registers (or `y` for registers only), always normalized to `/`.
 - **Zero runtime dependencies.** No telescope, no snacks, no plenary. Pure Neovim stdlib.
 - **Keyboard-only.** Never requires the mouse.
 
@@ -63,7 +63,7 @@ The pieces exist in the ecosystem, but nothing combines them for a snacks-based 
 | # | Decision | Choice | Rationale |
 |---|---|---|---|
 | D1 | Architecture | **Standalone, zero-dependency** | Read-only *by construction*; cleanest public repo; works in any Neovim 0.10+ config; full control over yank semantics and slash handling. |
-| D2 | `y` semantics | **Both**: insert at cursor **and** set registers | Matches "yanks its full path into your buffer" (no extra paste step) while still leaving the path in `+`/`"` for later reuse and yanky.nvim workflows. |
+| D2 | Yank actions | `p` = paste at cursor **and** set registers; `y` = registers only (Vim-like) | `p` matches "yanks its full path into your buffer" (no extra paste step); `y` mirrors native Vim yank and composes with yanky.nvim. Split from an earlier single `y`=both during keymap tuning, which also retired the redundant `yank.insert` flag. |
 | D3 | Slash handling | Explicit final `gsub("\\","/")` on output | Predictable and literal — does exactly what the user asked. We deliberately do **not** rely on `vim.fs.normalize` for output (it *also* expands `~`/`$VAR` and collapses `..`, which can surprise). |
 | D4 | Read-only enforcement | Whitelist of read-only `vim.uv` calls + non-modifiable buffer + CI grep | "Safe to toy around" is a headline feature, so it's guaranteed and tested, not assumed. |
 | D5 | Min Neovim | **0.10** (0.11+ recommended) | `vim.uv`, `nvim_open_win`, scratch buffers exist in 0.10. Relative modes that use `vim.fs.relpath` (0.11+) degrade gracefully with a manual fallback. (User is on 0.12.2.) |
@@ -106,7 +106,7 @@ split for clarity; can be collapsed if desired.
 | `init.lua` | `setup`, `open`, `close`, `toggle`, `is_open`, `set_source_dir`, holds singleton state | No |
 | `config.lua` | Default options table + deep-merge of user opts; type annotations | No |
 | `explorer.lua` | Create/destroy the float window + scratch buffer; render lines; manage cursor; install buffer-local keymaps; capture origin (win/buf/cursor/mode) | No |
-| `actions.lua` | `yank` (insert + registers), `enter_dir`, `up`, `goto_path`, `drives`, `toggle_hidden`, `close` | No (delegates reads to `fs`) |
+| `actions.lua` | `yank` (registers), `yank_and_paste` (paste + registers), `yank_menu`, `enter`, `up`, `goto_path`, `drives`, `toggle_hidden` | No (delegates reads to `fs`) |
 | `fs.lua` | The **only** module that calls `vim.uv` — and only its **read** functions | **Read-only** |
 | `path.lua` | Pure functions: join, slash-normalize, relative-to-X computation | No |
 
@@ -158,23 +158,30 @@ The `../` row is a synthetic pseudo-entry: selecting it goes up; it is **not** y
 - **Enter dir** (`<CR>`/`l`): if entry is a directory → set `cwd`, rescan, re-render, cursor to top.
 - **Up** (`-`/`h`): `cwd = dirname(cwd)`; at a drive root, show the **drives view** instead.
 - **Goto** (`<C-g>`): `vim.ui.input` → type any absolute path / `~` / `D:/projects` → normalize → cd.
-- **Drives** (`<C-d>`, Windows): probe `A:/`…`Z:/` with `vim.uv.fs_stat`; list the ones that exist.
+- **Drives** (`D`, Windows): probe `A:/`…`Z:/` with `vim.uv.fs_stat`; list the ones that exist.
+  (`<C-d>`/`<C-u>` are left unmapped so they keep their native half-page scroll.)
 - **Toggle hidden** (`.`): flip `show_hidden`, rescan view.
 
-### 7.3 Yank (`y`) — the heart, "Both" semantics
+### 7.3 Yank — `y` (registers) and `p` (registers + paste)
+
+Both keys share one worker, `do_yank(mode, insert)`: `y` calls it with `insert=false`, `p` with
+`insert=true`.
 ```
 entry = entry_under_cursor()           -- ignore the "../" pseudo-row
 abspath = entry.path                   -- already absolute + forward-slash
 out = path.transform(abspath, cfg.yank.default_mode, cfg)   -- relative if configured...
-out = out:gsub("\\", "/")              -- ...then GUARANTEED slash normalize (D3)
+out = path.apply_separator(out, cfg.yank.separator)   -- GUARANTEED slash normalize (D3)
 if entry.is_dir and cfg.yank.dir_trailing_slash then out = out .. "/" end
 
--- (1) registers  (the "Both")
+-- (1) registers  (both actions)
 for _, r in ipairs(cfg.yank.registers) do vim.fn.setreg(r, out) end   -- default {'"','+'}
 
--- (2) insert at cursor in the ORIGIN buffer  (the "Both")
+-- `y` ends here (registers only); only `p` continues to paste:
+if not insert then close_float() return end
+
+-- (2) `p`: paste at the ORIGIN cursor
 close_float()                          -- restores focus to origin_win
-if cfg.yank.insert and nvim_buf_is_valid(origin_buf) and buf_is_modifiable(origin_buf) then
+if nvim_buf_is_valid(origin_buf) and buf_is_modifiable(origin_buf) then
   local row = origin_cursor[1] - 1
   local col = origin_cursor[2]
   nvim_buf_set_text(origin_buf, row, col, row, col, { out })   -- single line, no newline
@@ -183,10 +190,10 @@ else
   notify("yfp: origin buffer not writable — path copied to registers only")
 end
 ```
-- **Insert position** is configurable: `at_cursor` (default — drops exactly where the cursor was,
-  as if typed) or `after_cursor` (paste-like, mimics `p`).
+- **Insert position** is configurable: `at_cursor` (drops exactly where the cursor was,
+  as if typed) or `after_cursor` (default — paste-like, mimics `p`).
 - If launched from **insert mode**, optionally `startinsert` afterward (`cfg.yank.keep_insert`).
-- `Y` = registers only (no insert). `gy` = pick a path mode via `vim.ui.select` before yanking.
+- `gy` = pick a path mode via `vim.ui.select`, then yank-and-paste.
 
 ---
 
@@ -231,12 +238,11 @@ require("yfp").setup({
   sort = "name",               -- "name" | "type"
   resolve_symlinks = false,    -- yank the symlink path, not its target
 
-  -- the yank action
+  -- the yank actions (y = registers; p = registers + paste)
   yank = {
     separator = "/",           -- "/" force forward slashes | "\\" | "os" (native)
-    insert = true,             -- D2: insert at cursor in the origin buffer
-    registers = { '"', '+' },  -- D2: also set these registers (unnamed + system clipboard)
-    insert_position = "at_cursor",  -- "at_cursor" | "after_cursor"
+    registers = { '"', '+' },  -- D2: registers set by both actions (unnamed + system clipboard)
+    insert_position = "at_cursor",  -- "at_cursor" | "after_cursor" (paste action)
     keep_insert = true,        -- re-enter insert mode if YFP was opened from insert mode
     dir_trailing_slash = false,
     default_mode = "absolute", -- "absolute" | "relative_cwd" | "relative_buffer"
@@ -248,19 +254,19 @@ require("yfp").setup({
   icons = { enabled = true },  -- uses mini.icons / nvim-web-devicons IF present; text fallback else
 
   keymaps = {                  -- buffer-local, active only inside the float
-    yank          = "y",
-    yank_register = "Y",
-    yank_menu     = "gy",
-    enter         = { "<CR>", "l" },
-    up            = { "-", "h" },
-    goto_path     = "<C-g>",
-    drives        = "<C-d>",
-    home          = "~",
-    cwd           = "=",
-    toggle_hidden = ".",
-    filter        = "/",       -- v1.1 in-float fuzzy filter
-    close         = { "q", "<Esc>" },
-    help          = "g?",
+    yank           = "y",      -- registers only (Vim-like)
+    yank_and_paste = "p",      -- insert at cursor + set registers
+    yank_menu      = "gy",
+    enter          = { "<CR>", "l" },
+    up             = { "-", "h" },
+    goto_path      = "<C-g>",
+    drives         = "D",
+    home           = "~",
+    cwd            = "=",
+    toggle_hidden  = ".",
+    filter         = "/",      -- v1.1 in-float fuzzy filter
+    close          = { "q", "<Esc>" },
+    help           = "g?",
   },
 })
 ```
@@ -275,7 +281,7 @@ zero-dependency promise.
 
 | Stage | Feature | Notes |
 |---|---|---|
-| v1.0 | Read-only float explorer · browse anywhere · `y`=insert+registers · `/` normalize · drives view | Core. No deps. |
+| v1.0 | Read-only float explorer · browse anywhere · `y`=registers / `p`=paste · `/` normalize · drives view | Core. No deps. |
 | v1.1 | **In-float fuzzy filter** (`/`) | "find sprinkled on top." Filters the current dir listing in-place; pure Lua, no deps. |
 | v1.2 | **Relative path modes** + `gy` menu | `relative_cwd` / `relative_buffer` / `relative_git` / `relative_custom`. Uses `vim.fs.relpath` (0.11+) with a manual fallback. This is the user's "advanced" feature. |
 | v1.3 | **Recursive find** | Async `vim.uv` walk under cwd → flat filtered list, still read-only, still `y`. Guard with max depth/results to stay snappy. |
@@ -295,7 +301,7 @@ zero-dependency promise.
 | Launched from insert mode | Cursor captured pre-command; insert at captured col; `startinsert` if `keep_insert`. |
 | Paths with spaces / multibyte | `nvim_buf_set_text` is byte-safe; optional quoting is a future config, not v1. |
 | yanky.nvim history | `setreg` doesn't push to yanky's ring; optional enhancement to fire `TextYankPost` or call yanky API (documented, not v1). |
-| `../` pseudo-row | Not yankable; `y` on it is a no-op + hint. |
+| `../` pseudo-row | Not yankable; `y`/`p` on it is a no-op + hint. |
 
 ---
 
@@ -309,7 +315,8 @@ yfp.close()
 yfp.toggle()
 yfp.is_open()               -- boolean
 yfp.set_source_dir(dir)     -- base for relative_custom
-yfp.yank_under_cursor(mode?)-- programmatic yank
+yfp.yank_under_cursor(mode?)           -- programmatic yank to registers
+yfp.yank_and_paste_under_cursor(mode?) -- programmatic yank + paste
 ```
 
 Command: `:YFP [path]` — open at `path`, else `default_start`.
@@ -346,6 +353,8 @@ Suggested LazyVim mapping (add in `lua/plugins/yfp.lua`):
 - **2026-06-17** — D1 *standalone, zero-dependency* chosen over a snacks layer: read-only by
   construction and a clean public repo outweigh getting find/grep "for free." Find/grep becomes an
   optional built-in (v1.1) with optional external delegation (never a hard dep).
-- **2026-06-17** — D2 `y` does **both**: insert at cursor *and* set `{'"','+'}` registers.
+- **2026-06-17** — D2 yank actions: `p` = paste at cursor *and* set `{'"','+'}` registers; `y` =
+  registers only (Vim-like). Split from an earlier single `y`=both during keymap tuning; drives moved
+  off `<C-d>` (LazyVim scroll) to `D`; the now-redundant `yank.insert` flag was removed.
 - **2026-06-17** — D3 output slash handling is an explicit final `gsub("\\","/")`, not
   `vim.fs.normalize`, to stay literal and avoid surprising `~`/`$VAR`/`..` expansion.

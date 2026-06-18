@@ -36,11 +36,8 @@ local function build_path(entry, mode)
   return out
 end
 
---- Yank the path under the cursor: set registers and (optionally) insert at the origin cursor.
----@param mode string|nil
----@param override table|nil  { insert: boolean }
-function M.yank(mode, override)
-  override = override or {}
+-- Worker: yank to the configured registers, optionally pasting at the origin cursor.
+local function do_yank(mode, insert)
   local exp = explorer()
   local state = exp.state
   if not state then
@@ -66,8 +63,7 @@ function M.yank(mode, override)
 
   exp.close()
 
-  local do_insert = cfg.yank.insert and override.insert ~= false
-  if not do_insert then
+  if not insert then
     notify("yanked: " .. out)
     return
   end
@@ -104,11 +100,23 @@ function M.yank(mode, override)
   notify("inserted: " .. out)
 end
 
+--- Yank the path under the cursor to the configured registers (Vim-like; no paste).
+---@param mode string|nil
+function M.yank(mode)
+  do_yank(mode, false)
+end
+
+--- Yank the path under the cursor AND paste it at the origin cursor.
+---@param mode string|nil
+function M.yank_and_paste(mode)
+  do_yank(mode, true)
+end
+
 function M.yank_menu()
   local modes = { "absolute", "relative_cwd", "relative_buffer", "relative_git", "relative_custom" }
   vim.ui.select(modes, { prompt = "yfp: path format" }, function(choice)
     if choice then
-      M.yank(choice)
+      M.yank_and_paste(choice)
     end
   end)
 end
@@ -206,8 +214,8 @@ function M.help()
   end
   local lines = {
     "yfp — keys inside the float:",
-    ("  %-12s yank: insert at cursor + set registers"):format(f(km.yank)),
-    ("  %-12s yank to registers only"):format(f(km.yank_register)),
+    ("  %-12s yank to registers only"):format(f(km.yank)),
+    ("  %-12s yank AND paste at the cursor"):format(f(km.yank_and_paste)),
     ("  %-12s yank, choosing a path format"):format(f(km.yank_menu)),
     ("  %-12s enter directory"):format(f(km.enter)),
     ("  %-12s go up"):format(f(km.up)),

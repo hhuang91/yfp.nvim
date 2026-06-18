@@ -19,9 +19,8 @@ M.defaults = {
 
   yank = {
     separator = "/", -- "/" force forward slashes | "\\" | "os" (native)
-    insert = true, -- insert at cursor in the buffer you came from
-    registers = { '"', "+" }, -- also copy to these registers
-    insert_position = "at_cursor", -- "at_cursor" | "after_cursor"
+    registers = { '"', "+" }, -- copy to these registers (both yank actions)
+    insert_position = "after_cursor", -- "at_cursor" | "after_cursor" (paste action)
     keep_insert = true, -- re-enter insert mode if opened from insert mode
     dir_trailing_slash = false,
     default_mode = "absolute", -- see README for the full list of modes
@@ -32,13 +31,13 @@ M.defaults = {
   icons = { enabled = true }, -- uses mini.icons / nvim-web-devicons if present
 
   keymaps = {
-    yank = "y",
-    yank_register = "Y",
+    yank = "y", -- registers only (Vim-like)
+    yank_and_paste = "p", -- insert at the cursor + set registers
     yank_menu = "gy",
     enter = { "<CR>", "l" },
     up = { "-", "h" },
     goto_path = "<C-g>",
-    drives = "<C-d>",
+    drives = "D",
     home = "~",
     cwd = "=",
     toggle_hidden = ".",

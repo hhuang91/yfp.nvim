@@ -35,7 +35,9 @@ slash surgery, no leaving the keyboard.
 
 ### Non-goals (v1)
 - No create / rename / move / delete / chmod — ever. (See §8, Read-only guarantee.)
-- No file *preview* or *opening* files for editing (it's a path picker, not a file manager).
+- No file *preview* in the float, and no file *management* (create / rename / move / delete). Opening
+  a file to **edit** it (`o`) is supported as a convenience — it's a `:edit` (a read), so the
+  read-only-by-construction guarantee is untouched; yfp simply isn't a file *manager* (decision D7).
 - No tree view with persistent expand/collapse state — it's a single-directory pane you navigate
   in/out of (simpler, faster, predictable).
 - No fuzzy *grep* of file contents in core (may be delegated to an external picker later — §10).
@@ -237,6 +239,15 @@ pane (e.g. `:q` in it) restores the main float to full height. A single `WinClos
 the closed window id arbitrates, with a `state.closing` guard to avoid a relayout flash during a full
 close.
 
+### 7.5 Open (`o`)
+
+`o` opens the selected entry in the window yfp was launched from (`origin_win`), picker-style: close
+the float, focus `origin_win` (graceful fallback if it's gone), then `:edit` the file. Files only —
+on a directory or the `../` row it just notifies "not a file". It behaves identically from the main
+view and the pinned panel (a directory pin says so; a missing file pin notifies). Opening is a
+**read** (`:edit`), so it does not touch the read-only guarantee — you edit and `:w` through your own
+buffer as usual (see D7).
+
 ---
 
 ## 8. Read-only guarantee (a headline feature)
@@ -321,6 +332,7 @@ require("yfp").setup({
     yank_and_paste_menu = "gp",     -- pick a path format, then yank + paste
     enter               = { "<CR>", "l" },
     up                  = { "-", "h" },
+    open                = "o",      -- open the selected file in the origin window
     goto_path           = "<C-g>",
     drives              = "D",
     home                = "~",
@@ -348,7 +360,8 @@ zero-dependency promise.
 | Stage | Feature | Notes |
 |---|---|---|
 | v1.0 | Read-only float explorer · browse anywhere · `y`=registers / `p`=paste · `/` normalize · drives view | Core. No deps. |
-| ✅ | **Pinned locations** — toggleable bottom pane (`<Tab>`), `P` to pin / `x` to remove / `<CR>` to jump | §7.4. Persists to `stdpath("data")/yfp/pins.json` (D6). Still no deps. |
+| ✅ | **Pinned locations** — toggleable bottom panel (`P`), `<Tab>` to focus, `a` to pin / `d` to remove / `<CR>` to jump | §7.4. Persists to `stdpath("data")/yfp/pins.json` (D6). Still no deps. |
+| ✅ | **Open in place** — `o` edits the selected file in the window you launched from | §7.5. Files only; a `:edit` (read), so still read-only by construction (D7). |
 | v1.1 | **In-float fuzzy filter** (`/`) | "find sprinkled on top." Filters the current dir listing in-place; pure Lua, no deps. |
 | v1.2 | **Relative path modes** + `gy` menu | `relative_cwd` / `relative_buffer` / `relative_git` / `relative_custom`. Uses `vim.fs.relpath` (0.11+) with a manual fallback. This is the user's "advanced" feature. |
 | v1.3 | **Recursive find** | Async `vim.uv` walk under cwd → flat filtered list, still read-only, still `y`. Guard with max depth/results to stay snappy. |
@@ -437,3 +450,9 @@ Suggested LazyVim mapping (add in `lua/plugins/yfp.lua`):
   the CI grep to confine writes to `persist.lua` → `stdpath("data")`. UI form chosen: a toggleable
   **bottom pane** (a second float), over a side pane (more layout churn) or a `vim.ui.select`
   quick-jump (no navigable buffer; can't `l`/remove in place).
+- **2026-06-18** — D7: relax the "no opening files" non-goal — `o` opens the selected file (in the
+  origin window, picker-style) from either the main view or the pinned panel. Rationale: yfp is the
+  location-first browser, which is exactly the gap name/content fuzzy-finders and project-scoped tree
+  explorers leave open; opening pairs naturally with pinned locations. Crucially this does **not**
+  weaken the read-only guarantee — `:edit` is a read; yfp's code still calls no write API (the CI grep
+  is unaffected). Scope only: yfp gains "open", but remains a navigator, not a file *manager*.

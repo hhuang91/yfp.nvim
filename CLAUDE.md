@@ -47,8 +47,8 @@ lua/yfp/
                  captures origin (win/buf/cursor/mode) at open; owns the bottom "pinned" pane
                  (second float). NO filesystem writes.
   actions.lua    Handlers: yank (registers), yank_and_paste (paste + registers),
-                 yank_menu/yank_and_paste_menu (gy/gp format pickers), enter, up, goto_path, drives,
-                 toggle_hidden, pin_add/pin_remove/pin_jump. Reads via fs.lua.
+                 yank_menu/yank_and_paste_menu (gy/gp format pickers), enter, open_entry (o, :edit),
+                 up, goto_path, drives, toggle_hidden, pin_add/pin_remove/pin_jump. Reads via fs.lua.
   fs.lua         THE ONLY module that calls vim.uv — read-only functions only.
   path.lua       Pure functions: join, slash-normalize, relative-to-{cwd,buffer,git,custom}.
   pins.lua       In-memory pinned-locations list: add/remove/dedupe. NO direct I/O (delegates).
@@ -144,6 +144,10 @@ There is no build step — it's Lua loaded by Neovim.
   to the *browsed* filesystem; writing our own state file (like sessions/shada) is allowed and the CI
   grep now proves the write target is confined to `stdpath("data")`. UI form: a toggleable **bottom
   pane** (second float). See DESIGN.md §15.
+- **2026-06-18** — D7: `o` opens the selected file in the origin window (picker-style), from the main
+  view or the pinned panel. This is a `:edit` (a read) — it does **not** weaken the read-only
+  guarantee (yfp's code still calls no write API; the CI grep is unaffected). It relaxes only the
+  scope non-goal "no opening files"; yfp stays a navigator, not a file manager. See DESIGN.md §7.5.
 
 ## Style
 

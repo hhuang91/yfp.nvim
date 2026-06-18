@@ -48,6 +48,7 @@ M.defaults = {
     yank_and_paste_menu = "gp", -- pick a path format, then yank + paste
     enter = { "<CR>", "l" },
     up = { "-", "h" },
+    open = "o", -- open the selected file in the origin window (files only)
     goto_path = "<C-g>",
     drives = "D",
     home = "~",

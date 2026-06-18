@@ -307,6 +307,67 @@ function M.pin_jump()
   end
 end
 
+-- Close the float and :edit `abspath` in the window yfp was launched from
+-- (picker-style). Opening is a read -- yfp still never writes the filesystem.
+local function do_open(abspath)
+  local exp = explorer()
+  local state = exp.state
+  local origin_win = state and state.origin_win
+  exp.close()
+  if origin_win and api.nvim_win_is_valid(origin_win) then
+    pcall(api.nvim_set_current_win, origin_win)
+  end
+  local ok, err = pcall(vim.cmd.edit, vim.fn.fnameescape(abspath))
+  if not ok then
+    notify("could not open: " .. tostring(err), vim.log.levels.WARN)
+    return
+  end
+  notify("opened: " .. abspath)
+end
+
+--- Open the selected entry in the origin window. Works from the main view and
+--- the pinned panel; only files open (folders/`../` just say so).
+function M.open_entry()
+  local exp = explorer()
+  local state = exp.state
+  if not state then
+    return
+  end
+  local fs = require("yfp.fs")
+  -- pinned panel side (focus is in the pane)
+  if
+    state.pin_win
+    and api.nvim_win_is_valid(state.pin_win)
+    and api.nvim_get_current_win() == state.pin_win
+  then
+    local row = exp.current_pin_row()
+    if not row or row.kind ~= "pin" then
+      return
+    end
+    if row.pin.is_dir then
+      notify("that pin is a folder, not a file")
+      return
+    end
+    if not fs.exists(row.pin.path) then
+      notify("file no longer exists: " .. row.pin.path, vim.log.levels.WARN)
+      return
+    end
+    do_open(row.pin.path)
+    return
+  end
+  -- main view side
+  local row = exp.current_row()
+  if not row or row.kind ~= "entry" then
+    notify("nothing to open on this line")
+    return
+  end
+  if row.entry.is_dir then
+    notify("that's a folder, not a file")
+    return
+  end
+  do_open(row.entry.path)
+end
+
 function M.filter()
   notify("in-float fuzzy filter arrives in v1.1 (use / for native search for now)")
 end
@@ -323,6 +384,7 @@ function M.help()
     ("  %-12s yank (registers), pick a format"):format(f(km.yank_menu)),
     ("  %-12s yank AND paste, pick a format"):format(f(km.yank_and_paste_menu)),
     ("  %-12s enter directory"):format(f(km.enter)),
+    ("  %-12s open the file (origin window)"):format(f(km.open)),
     ("  %-12s go up"):format(f(km.up)),
     ("  %-12s go to a typed path"):format(f(km.goto_path)),
     ("  %-12s list drives (Windows)"):format(f(km.drives)),

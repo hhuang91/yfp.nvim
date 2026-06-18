@@ -36,8 +36,10 @@ backslashes for anything else. `yfp` fixes the whole loop without leaving the ke
   one thing it writes is its own pinned-locations list under your Neovim data dir — never your files.)
 - 📋 **One job, done well:** press `p` on a file/folder to **paste** its path at your cursor *and*
   set the `"`/`+` registers, or `y` to set the registers only (Vim-style) — always `/`-normalized.
-- 📌 **Pinned locations.** Bookmark files/folders in a toggleable bottom pane (`<Tab>`), jump straight
-  back to any of them, and have the list persist across sessions.
+- 📌 **Pinned locations.** Bookmark files/folders in a toggleable bottom panel, jump straight back to
+  any of them, and have the list persist across sessions.
+- 📂 **Open in place.** Press `o` on a file to edit it in the window you came from — handy when you
+  know *where* a file is but not its name. (Opening is a `:edit` read; yfp still never writes a thing.)
 - 🧩 **Zero dependencies.** No telescope, no snacks, no plenary. Pure Neovim stdlib.
 - ⌨️ **Keyboard-only.** The mouse stays untouched.
 
@@ -105,6 +107,7 @@ Clone, then point lazy.nvim at the local copy:
 | `gy` | Pick a path format (absolute / relative…), then **yank** to registers |
 | `gp` | Pick a path format, then **yank and paste** at the cursor |
 | `<CR>` / `l` | Enter directory |
+| `o` | Open the selected **file** in the window you launched yfp from |
 | `-` / `h` | Go up (drives view at a drive root) |
 | `<C-g>` | Go to a typed path (any folder / drive / `~`) |
 | `D` | List drives (Windows) |
@@ -139,7 +142,8 @@ re-navigating:
    the panel (that's `P`'s job).
 4. In the panel, press **`<CR>`** / **`l`** on a pin to send the main view there — a folder opens, a
    file opens its folder with the cursor on the file — and focus hops back to the main view (the panel
-   stays open). Press **`d`** to remove the pin under the cursor.
+   stays open). Press **`o`** on a *file* pin to open it in your origin window instead of jumping, or
+   **`d`** to remove the pin under the cursor.
 
 The list is saved to `stdpath("data")/yfp/pins.json` (e.g. `~/AppData/Local/nvim-data/yfp/pins.json`
 on Windows) and reloaded on the next session — it's the **only** file `yfp` ever writes, and it's
@@ -198,6 +202,7 @@ require("yfp").setup({
     yank_and_paste_menu = "gp",   -- pick a path format, then yank + paste
     enter               = { "<CR>", "l" },
     up                  = { "-", "h" },
+    open                = "o",      -- open the selected file in the origin window
     goto_path           = "<C-g>",
     drives              = "D",
     home                = "~",
@@ -278,9 +283,11 @@ Yes. Zero runtime dependencies — it's pure Neovim stdlib.
 Because that also rewrites any *legitimate* backslashes in your buffer. `yfp` only converts the path
 it inserts, leaving the rest of your file untouched.
 
-**Can it open/edit the file I select?**
-No — by design. It's a *path* picker, not a file manager. That keeps it minimal and guarantees it
-can't modify anything.
+**Can it open the file I select?**
+Yes — press `o` to open it in the window you launched yfp from (files only; on a folder it just says
+so). That's a normal `:edit` (a read), so yfp *still* can't modify anything on disk — you edit and
+save through your own buffer as usual. yfp stays a navigator, not a file *manager* (no
+create/rename/move/delete).
 
 **Do the yank keys overwrite my clipboard?**
 Both `y` and `p` set the `"` and `+` registers by default (configurable via `yank.registers`). Set

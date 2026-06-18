@@ -281,6 +281,7 @@ local function set_keymaps(buf)
   map(km.yank_menu, actions.yank_menu)
   map(km.yank_and_paste_menu, actions.yank_and_paste_menu)
   map(km.enter, actions.enter)
+  map(km.open, actions.open_entry)
   map(km.up, actions.up)
   map(km.goto_path, actions.goto_path)
   map(km.drives, actions.drives)
@@ -300,8 +301,9 @@ local function set_keymaps(buf)
 end
 
 -- Buffer-local keymaps for the pinned-locations pane. <CR>/l jumps the main view
--- to the pin, the remove key drops it, pin_toggle (P) closes the panel, pin_focus
--- (<Tab>) switches focus back to the main view, q/<Esc> closes everything.
+-- to the pin, `open` (o) edits a file pin, the remove key drops it, pin_toggle (P)
+-- closes the panel, pin_focus (<Tab>) switches focus back to the main view, and
+-- q/<Esc> closes everything.
 local function set_pin_keymaps(buf)
   local km = config.options.keymaps
   local actions = require("yfp.actions")
@@ -315,6 +317,7 @@ local function set_pin_keymaps(buf)
     end
   end
   map(km.enter, actions.pin_jump)
+  map(km.open, actions.open_entry)
   map(km.pin_remove, actions.pin_remove)
   map(km.pin_toggle, M.toggle_pins)
   map(km.pin_focus, M.focus_pins)

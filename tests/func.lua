@@ -100,4 +100,41 @@ pcall(vim.fn.delete, pinfile)
 yfp.setup({})
 print("yfp: pinned-panel toggle/focus/add(gated)/jump/remove + persistence tests passed")
 
+-- 4) open (`o`): edits a file in the origin window from either side; refuses folders
+vim.o.hidden = true -- let :edit replace a modified scratch buffer without erroring
+yfp.setup({ yank = { registers = {} }, pins = { file = pinfile } })
+pins.reset()
+yfp.open({ cwd = tmp })
+local origin = exp.state.origin_win
+
+-- main view: a folder (row 2 = "sub/") is refused, the float stays open
+vim.api.nvim_win_set_cursor(exp.state.win, { 2, 0 })
+actions.open_entry()
+assert(yfp.is_open(), "open on a folder keeps the float open")
+
+-- main view: a file (row 3 = "alpha.txt") opens in the origin window
+vim.api.nvim_win_set_cursor(exp.state.win, { 3, 0 })
+actions.open_entry()
+assert(not yfp.is_open(), "open on a file closes the float")
+local got = (vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(origin)):gsub("\\", "/"))
+assert(got == expected, "the file is loaded in the origin window")
+
+-- pinned panel: `o` on a file pin opens it too
+vim.fn.writefile({ "y" }, tmp .. "/beta.txt")
+pins.reset()
+pins.add({ path = tmp .. "/beta.txt", is_dir = false })
+yfp.open({ cwd = tmp })
+origin = exp.state.origin_win
+exp.toggle_pins()
+vim.api.nvim_set_current_win(exp.state.pin_win)
+vim.api.nvim_win_set_cursor(exp.state.pin_win, { 1, 0 })
+actions.open_entry()
+assert(not yfp.is_open(), "open from the panel closes the UI")
+local got2 = (vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(origin)):gsub("\\", "/"))
+assert(got2 == tmp .. "/beta.txt", "the pinned file opens in the origin window")
+pins.reset()
+pcall(vim.fn.delete, pinfile)
+yfp.setup({})
+print("yfp: open-in-origin-window (main + pinned panel) tests passed")
+
 print("yfp: functional yank_and_paste + registers-only tests passed")

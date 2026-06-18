@@ -38,6 +38,7 @@ Inside the float (all remappable via the `keymaps` option):
     gy          yank to registers, choosing a path format (absolute/relative)
     gp          yank AND paste, choosing a path format
     <CR> / l    enter directory
+    o           open the selected file in the origin window (files only)
     - / h       go up (drives view at a drive root, Windows)
     <C-g>       go to a typed path (any folder / drive / ~)
     D           list drives (Windows)
@@ -112,6 +113,7 @@ yfp is read-only by construction over the filesystem you browse: the explorer
 buffer is not modifiable, only read-only libuv calls are used, and it never
 shells out. The only thing yfp writes is its own pinned-locations file under
 stdpath("data") (see |yfp-pins|), confined to one module and enforced by a CI
-grep. Your files are never touched. See CLAUDE.md.
+grep. Pressing `o` opens a file with :edit -- a read; you then edit and save
+through your own buffer. yfp's code never modifies your files. See CLAUDE.md.
 
 vim:tw=78:ts=8:et:ft=help:norl:

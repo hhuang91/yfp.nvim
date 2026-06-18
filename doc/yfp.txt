@@ -1,0 +1,76 @@
+*yfp.txt*          Yank a file path into your buffer, with forward slashes
+
+==============================================================================
+INTRODUCTION                                                            *yfp*
+
+yfp (Yank File Path) is a floating, read-only file browser. Navigate to any
+file or folder anywhere on the machine and press `y` to drop its full path
+into the buffer you were editing -- normalized to forward slashes (/), even
+on Windows -- and into your registers.
+
+It has zero runtime dependencies and cannot modify the filesystem.
+
+Requirements: Neovim >= 0.10 (0.11+ recommended for relative-path modes).
+
+==============================================================================
+SETUP                                                             *yfp-setup*
+
+>lua
+    require("yfp").setup({})
+<
+All options are optional. See |yfp-config| or README.md for the full default
+table.
+
+==============================================================================
+COMMANDS                                                       *yfp-commands*
+
+                                                                       *:YFP*
+:YFP [path]     Open the browser at [path], or at the configured start
+                directory (default: the directory of the current file).
+
+==============================================================================
+MAPPINGS                                                       *yfp-mappings*
+
+Inside the float (all remappable via the `keymaps` option):
+
+    y           yank: insert path at cursor AND set registers (", +)
+    Y           yank to registers only
+    gy          yank, choosing a path format (absolute / relative...)
+    <CR> / l    enter directory
+    - / h       go up (drives view at a drive root, Windows)
+    <C-g>       go to a typed path (any folder / drive / ~)
+    <C-d>       list drives (Windows)
+    ~           jump to home
+    =           jump to the working directory
+    .           toggle hidden files
+    q / <Esc>   close
+    g?          help
+
+==============================================================================
+API                                                                 *yfp-api*
+
+    require("yfp").open(opts)        opts = { cwd = "D:/projects" }
+    require("yfp").close()
+    require("yfp").toggle()
+    require("yfp").is_open()
+    require("yfp").set_source_dir(dir)
+    require("yfp").yank_under_cursor(mode)
+
+==============================================================================
+CONFIG                                                           *yfp-config*
+
+See README.md for the full default table. Highlights:
+
+    yank.separator      "/" (force forward slashes) | "\\" | "os"
+    yank.insert         true: insert at cursor in the origin buffer
+    yank.registers      { '"', '+' }: also copy to these registers
+    yank.default_mode   "absolute" | "relative_cwd" | "relative_buffer"
+                        | "relative_git" | "relative_custom"
+
+==============================================================================
+SAFETY                                                           *yfp-safety*
+
+yfp is read-only by construction: the explorer buffer is not modifiable, only
+read-only libuv calls are used, and it never shells out. See CLAUDE.md.
+
+vim:tw=78:ts=8:et:ft=help:norl:

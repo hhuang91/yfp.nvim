@@ -100,7 +100,9 @@ There is no build step — it's Lua loaded by Neovim.
 ## Playbooks (common changes)
 
 - **Add a keymap:** add a default to `config.keymaps`, document it in README's keymap table and
-  `doc/yfp.txt`, and wire the handler in `explorer.lua`'s keymap installer → `actions.lua`.
+  `doc/yfp.txt`, and wire the handler in `explorer.lua`'s keymap installer → `actions.lua`. Pass a
+  `desc` (third arg to the installer's `map`) — that's what which-key/`:map` display; a blank `desc`
+  shows up as an empty which-key entry.
 - **Add a path mode:** implement a pure function in `path.lua`, add it to `yank.default_mode` and the
   `gy`/`gp` menu list (`do_menu` in `actions.lua`), ensure the final `gsub("\\","/")` still runs, add
   a unit test. Update both docs' mode tables.

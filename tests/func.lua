@@ -107,6 +107,15 @@ pins.reset()
 yfp.open({ cwd = tmp })
 local origin = exp.state.origin_win
 
+-- buffer-local maps carry a description (so which-key shows something, not blank)
+local desc_a
+for _, mp in ipairs(vim.api.nvim_buf_get_keymap(exp.state.buf, "n")) do
+  if mp.lhs == "a" then
+    desc_a = mp.desc
+  end
+end
+assert(desc_a and desc_a ~= "", "keymaps must set a non-empty desc (for which-key)")
+
 -- main view: a folder (row 2 = "sub/") is refused, the float stays open
 vim.api.nvim_win_set_cursor(exp.state.win, { 2, 0 })
 actions.open_entry()

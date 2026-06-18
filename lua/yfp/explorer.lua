@@ -263,40 +263,41 @@ end
 local function set_keymaps(buf)
   local km = config.options.keymaps
   local actions = require("yfp.actions")
-  local function map(lhs, fn)
+  -- `desc` is what which-key (and :map) display, so every mapping gets one.
+  local function map(lhs, fn, desc)
     if not lhs then
       return
     end
     local list = (type(lhs) == "table") and lhs or { lhs }
     for _, l in ipairs(list) do
-      vim.keymap.set("n", l, fn, { buffer = buf, nowait = true, silent = true })
+      vim.keymap.set("n", l, fn, { buffer = buf, nowait = true, silent = true, desc = desc })
     end
   end
   map(km.yank, function()
     actions.yank("default")
-  end)
+  end, "Yank path to registers")
   map(km.yank_and_paste, function()
     actions.yank_and_paste("default")
-  end)
-  map(km.yank_menu, actions.yank_menu)
-  map(km.yank_and_paste_menu, actions.yank_and_paste_menu)
-  map(km.enter, actions.enter)
-  map(km.open, actions.open_entry)
-  map(km.up, actions.up)
-  map(km.goto_path, actions.goto_path)
-  map(km.drives, actions.drives)
+  end, "Yank + paste path")
+  map(km.yank_menu, actions.yank_menu, "Yank path (pick format)")
+  map(km.yank_and_paste_menu, actions.yank_and_paste_menu, "Yank + paste (pick format)")
+  map(km.enter, actions.enter, "Enter directory")
+  map(km.open, actions.open_entry, "Open file in origin window")
+  map(km.up, actions.up, "Go up a directory")
+  map(km.goto_path, actions.goto_path, "Go to a typed path")
+  map(km.drives, actions.drives, "List drives (Windows)")
   map(km.home, function()
     M.set_cwd(home())
-  end)
+  end, "Go to home directory")
   map(km.cwd, function()
     M.set_cwd(vim.fn.getcwd())
-  end)
-  map(km.toggle_hidden, actions.toggle_hidden)
-  map(km.pin_toggle, M.toggle_pins)
-  map(km.pin_focus, M.focus_pins)
-  map(km.pin_add, actions.pin_add)
-  map(km.close, M.close)
-  map(km.help, actions.help)
+  end, "Go to working directory")
+  map(km.toggle_hidden, actions.toggle_hidden, "Toggle hidden files")
+  map(km.pin_toggle, M.toggle_pins, "Toggle pinned panel")
+  map(km.pin_focus, M.focus_pins, "Focus main / pinned panel")
+  map(km.pin_add, actions.pin_add, "Pin item under cursor")
+  map(km.close, M.close, "Close yfp")
+  map(km.help, actions.help, "Show key help")
   -- km.filter is reserved for v1.1; native "/" search works in the meantime.
 end
 
@@ -307,22 +308,22 @@ end
 local function set_pin_keymaps(buf)
   local km = config.options.keymaps
   local actions = require("yfp.actions")
-  local function map(lhs, fn)
+  local function map(lhs, fn, desc)
     if not lhs then
       return
     end
     local list = (type(lhs) == "table") and lhs or { lhs }
     for _, l in ipairs(list) do
-      vim.keymap.set("n", l, fn, { buffer = buf, nowait = true, silent = true })
+      vim.keymap.set("n", l, fn, { buffer = buf, nowait = true, silent = true, desc = desc })
     end
   end
-  map(km.enter, actions.pin_jump)
-  map(km.open, actions.open_entry)
-  map(km.pin_remove, actions.pin_remove)
-  map(km.pin_toggle, M.toggle_pins)
-  map(km.pin_focus, M.focus_pins)
-  map(km.close, M.close)
-  map(km.help, actions.help)
+  map(km.enter, actions.pin_jump, "Jump to pinned location")
+  map(km.open, actions.open_entry, "Open file pin in origin window")
+  map(km.pin_remove, actions.pin_remove, "Remove pin")
+  map(km.pin_toggle, M.toggle_pins, "Toggle pinned panel")
+  map(km.pin_focus, M.focus_pins, "Focus main / pinned panel")
+  map(km.close, M.close, "Close yfp")
+  map(km.help, actions.help, "Show key help")
 end
 
 ---@param mode string

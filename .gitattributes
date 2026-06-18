@@ -1,0 +1,9 @@
+# Enforce LF line endings in the repo and working tree on every OS, so the shell
+# script stays runnable on Linux CI and CRLF never trips stylua's Unix check.
+* text=auto eol=lf
+
+# Never normalize binary assets (e.g. a future demo recording).
+*.gif binary
+*.png binary
+*.jpg binary
+*.ico binary

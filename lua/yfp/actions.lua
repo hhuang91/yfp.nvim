@@ -105,8 +105,7 @@ function M.yank(mode, override)
 end
 
 function M.yank_menu()
-  local modes =
-    { "absolute", "relative_cwd", "relative_buffer", "relative_git", "relative_custom" }
+  local modes = { "absolute", "relative_cwd", "relative_buffer", "relative_git", "relative_custom" }
   vim.ui.select(modes, { prompt = "yfp: path format" }, function(choice)
     if choice then
       M.yank(choice)

@@ -43,8 +43,41 @@ Inside the float (all remappable via the `keymaps` option):
     ~           jump to home
     =           jump to the working directory
     .           toggle hidden files
+    <Tab>       toggle the pinned-locations pane (focus it / close it)
+    P           pin the file/folder under the cursor (main view)
+    x / dd      remove the pin under the cursor (pinned pane)
+    <CR> / l    in the pinned pane: jump the main view to that pin
     q / <Esc>   close
     g?          help
+
+==============================================================================
+PINNED LOCATIONS                                                   *yfp-pins*
+
+Keep quick-access bookmarks of folders/files and jump back to them without
+re-navigating.
+
+    P           Pin the item under the cursor (the cwd itself on the "../"
+                row). Duplicates are ignored.
+    <Tab>       Toggle a "pinned" pane along the bottom of the float. From the
+                main view it opens and focuses the pane; from the pane it
+                closes it.
+    <CR> / l    (in the pane) jump the main view to the pin: a folder opens, a
+                file opens its parent with the cursor on the file. Focus
+                returns to the main view; the pane stays open.
+    x / dd      (in the pane) remove the pin under the cursor.
+
+The list persists to a JSON file in your Neovim data dir
+(stdpath("data").."/yfp/pins.json" by default) and is reloaded next session.
+This is the ONLY file yfp ever writes -- its own state, never the files you
+browse. Configure with the `pins` table:
+
+    pins.enabled    true  -- set false to disable the feature entirely
+    pins.file       nil   -- override the JSON path (default under stdpath data)
+    pins.height     0.25  -- pane height: ratio of the window, or integer rows
+    pins.title      " pinned "
+
+Stale pins (deleted or unmounted paths) are shown with a "[missing]" tag and
+left in place until you remove them.
 
 ==============================================================================
 API                                                                 *yfp-api*
@@ -66,11 +99,15 @@ See README.md for the full default table. Highlights:
     yank.registers      { '"', '+' }: set by both yank actions
     yank.default_mode   "absolute" | "relative_cwd" | "relative_buffer"
                         | "relative_git" | "relative_custom"
+    pins                pinned-locations pane; see |yfp-pins|
 
 ==============================================================================
 SAFETY                                                           *yfp-safety*
 
-yfp is read-only by construction: the explorer buffer is not modifiable, only
-read-only libuv calls are used, and it never shells out. See CLAUDE.md.
+yfp is read-only by construction over the filesystem you browse: the explorer
+buffer is not modifiable, only read-only libuv calls are used, and it never
+shells out. The only thing yfp writes is its own pinned-locations file under
+stdpath("data") (see |yfp-pins|), confined to one module and enforced by a CI
+grep. Your files are never touched. See CLAUDE.md.
 
 vim:tw=78:ts=8:et:ft=help:norl:

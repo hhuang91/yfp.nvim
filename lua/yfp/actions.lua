@@ -203,6 +203,90 @@ function M.toggle_hidden()
   notify("hidden files " .. (state.show_hidden and "shown" or "hidden"))
 end
 
+--- Pin the entry under the cursor in the main view (the cwd itself on "../").
+function M.pin_add()
+  local exp = explorer()
+  local state = exp.state
+  if not state then
+    return
+  end
+  if not config.options.pins.enabled then
+    notify("pins are disabled (set pins.enabled = true)")
+    return
+  end
+  local pins = require("yfp.pins")
+  local row = exp.current_row()
+  local target
+  if not row or row.kind == "up" then
+    target = { path = state.cwd, is_dir = true }
+  else
+    target = { path = row.entry.path, is_dir = row.entry.is_dir }
+  end
+  if pins.add(target) then
+    notify("pinned: " .. path.slashify(target.path))
+  else
+    notify("already pinned: " .. path.slashify(target.path))
+  end
+  exp.refresh_pins()
+end
+
+--- Remove the pin under the cursor in the pinned pane.
+function M.pin_remove()
+  local exp = explorer()
+  local state = exp.state
+  if not state then
+    return
+  end
+  local row, lnum = exp.current_pin_row()
+  if not row or row.kind ~= "pin" then
+    notify("no pin on this line")
+    return
+  end
+  local pins = require("yfp.pins")
+  local removed = pins.remove(lnum)
+  if removed then
+    notify("unpinned: " .. path.slashify(removed.path))
+    exp.refresh_pins()
+    local n = math.max(#pins.list(), 1)
+    if state.pin_win and api.nvim_win_is_valid(state.pin_win) then
+      pcall(api.nvim_win_set_cursor, state.pin_win, { math.min(lnum, n), 0 })
+    end
+  end
+end
+
+--- Jump the main view to the pin under the cursor, then focus the main float.
+--- Directory pins cd into them; file pins cd to the parent and land on the file.
+function M.pin_jump()
+  local exp = explorer()
+  local state = exp.state
+  if not state then
+    return
+  end
+  local row = exp.current_pin_row()
+  if not row or row.kind ~= "pin" then
+    return
+  end
+  local fs = require("yfp.fs")
+  local p = row.pin.path
+  if row.pin.is_dir then
+    if not fs.is_dir(p) then
+      notify("pinned folder is gone: " .. p, vim.log.levels.WARN)
+      return
+    end
+    exp.set_cwd(p)
+  else
+    local parent = path.parent(p) or vim.fs.dirname(p)
+    if not (parent and fs.is_dir(parent)) then
+      notify("pinned file's folder is gone: " .. p, vim.log.levels.WARN)
+      return
+    end
+    exp.set_cwd(parent, vim.fs.basename(p))
+  end
+  if state.win and api.nvim_win_is_valid(state.win) then
+    pcall(api.nvim_set_current_win, state.win)
+  end
+end
+
 function M.filter()
   notify("in-float fuzzy filter arrives in v1.1 (use / for native search for now)")
 end
@@ -223,6 +307,9 @@ function M.help()
     ("  %-12s list drives (Windows)"):format(f(km.drives)),
     ("  %-12s home / working dir"):format(f(km.home) .. " / " .. f(km.cwd)),
     ("  %-12s toggle hidden"):format(f(km.toggle_hidden)),
+    ("  %-12s pinned pane: focus / close"):format(f(km.pin_toggle)),
+    ("  %-12s pin the item (main view)"):format(f(km.pin_add)),
+    ("  %-12s remove the pin (pinned pane)"):format(f(km.pin_remove)),
     ("  %-12s close"):format(f(km.close)),
   }
   vim.notify(table.concat(lines, "\n"))

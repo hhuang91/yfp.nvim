@@ -72,4 +72,11 @@ function M.is_dir(p)
   return st ~= nil and st.type == "directory"
 end
 
+--- True if `p` exists at all (file, directory, or link target). Read-only.
+---@param p string
+---@return boolean
+function M.exists(p)
+  return uv.fs_stat(path.slashify(p)) ~= nil
+end
+
 return M

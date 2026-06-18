@@ -135,16 +135,129 @@ local function place_cursor_first(state)
   pcall(api.nvim_win_set_cursor, state.win, { math.max(target, 1), 0 })
 end
 
-local function geometry(w)
-  local cols = vim.o.columns
-  local lines = vim.o.lines
-  local width = (w.width <= 1) and math.floor(cols * w.width) or w.width
-  local height = (w.height <= 1) and math.floor(lines * w.height) or w.height
-  width = math.max(math.min(width, cols - 2), 20)
-  height = math.max(math.min(height, lines - 2), 5)
-  local row = math.max(math.floor((lines - height) / 2 - 1), 0)
+-- Put the cursor on the entry named `name` in the main listing (used after
+-- jumping to a pinned file so the file itself is highlighted). Falls back to the
+-- first entry if it isn't present (e.g. hidden, or removed since pinning).
+local function place_cursor_on(state, name)
+  for i, r in ipairs(state.rows) do
+    if r.kind == "entry" and r.entry.name == name then
+      pcall(api.nvim_win_set_cursor, state.win, { i, 0 })
+      return
+    end
+  end
+  place_cursor_first(state)
+end
+
+local function key_label(k)
+  if type(k) == "table" then
+    return tostring(k[1] or "?")
+  end
+  return tostring(k)
+end
+
+-- Render the pinned-locations pane (its own buffer). Each pin shows its full
+-- forward-slash path; missing paths are tagged so stale pins are obvious.
+local function render_pins(state)
+  if not (state.pin_buf and api.nvim_buf_is_valid(state.pin_buf)) then
+    return
+  end
+  local pins = require("yfp.pins").list()
+  local rows, lines = {}, {}
+  for _, it in ipairs(pins) do
+    rows[#rows + 1] = { kind = "pin", pin = it }
+    local ic = icon_for({ name = vim.fs.basename(it.path), is_dir = it.is_dir })
+    local prefix = (ic ~= "" and (ic .. " ")) or ""
+    local missing = fs.exists(it.path) and "" or "  [missing]"
+    lines[#lines + 1] = prefix .. path.slashify(it.path) .. (it.is_dir and "/" or "") .. missing
+  end
+  state.pin_rows = rows
+
+  if #lines == 0 then
+    local addkey = key_label(config.options.keymaps.pin_add)
+    lines = { "  (empty) press " .. addkey .. " on an item to pin it" }
+  end
+
+  api.nvim_set_option_value("modifiable", true, { buf = state.pin_buf })
+  api.nvim_buf_set_lines(state.pin_buf, 0, -1, false, lines)
+  api.nvim_set_option_value("modifiable", false, { buf = state.pin_buf })
+
+  api.nvim_buf_clear_namespace(state.pin_buf, ns, 0, -1)
+  for i, it in ipairs(pins) do
+    pcall(api.nvim_buf_set_extmark, state.pin_buf, ns, i - 1, 0, {
+      line_hl_group = it.is_dir and "YFPDir" or "YFPFile",
+      hl_mode = "combine",
+    })
+  end
+end
+
+local function ratio_or_abs(v, total)
+  if v <= 1 then
+    return math.floor(total * v)
+  end
+  return v
+end
+
+-- Compute the main float rect and, when the pinned pane is open, the bottom pane
+-- rect. The two floats are stacked and centered as a single block; opening the
+-- pane shortens the main listing rather than growing the overall footprint.
+---@param cfg table
+---@param pins_open boolean
+---@return table main, table|nil pin   -- rects { width, height, row, col } (content top-left)
+local function compute_layout(cfg, pins_open)
+  local cols, lines = vim.o.columns, vim.o.lines
+  local bt = (cfg.window.border and cfg.window.border ~= "none") and 1 or 0
+  local gap = 0 -- blank rows between the two floats (0 = stacked borders touch)
+
+  local width = ratio_or_abs(cfg.window.width, cols)
+  width = math.max(math.min(width, cols - 2 * (bt + 1)), 20)
+
+  local band = ratio_or_abs(cfg.window.height, lines)
+  band = math.max(math.min(band, lines - 2 - 2 * bt), 5)
+
+  local main_h, pin_h
+  if pins_open then
+    pin_h = ratio_or_abs(cfg.pins.height, band)
+    pin_h = math.max(math.min(pin_h, band - 3 - 2 * bt - gap), 1)
+    main_h = math.max(band - pin_h - 2 * bt - gap, 3)
+  else
+    pin_h, main_h = 0, band
+  end
+
+  local total = pins_open and (main_h + pin_h + 4 * bt + gap) or (main_h + 2 * bt)
+  local top = math.max(math.floor((lines - total) / 2), 0)
   local col = math.max(math.floor((cols - width) / 2), 0)
-  return width, height, row, col
+
+  local main = { width = width, height = main_h, row = top + bt, col = col }
+  local pin = nil
+  if pins_open then
+    pin = { width = width, height = pin_h, row = top + 3 * bt + main_h + gap, col = col }
+  end
+  return main, pin
+end
+
+-- Re-position the main float (and the pinned pane, if open) for the current
+-- `pins_open` state and terminal size. Used on toggle and on VimResized.
+local function relayout(state, pins_open)
+  local main, pin = compute_layout(config.options, pins_open)
+  if state.win and api.nvim_win_is_valid(state.win) then
+    pcall(api.nvim_win_set_config, state.win, {
+      relative = "editor",
+      row = main.row,
+      col = main.col,
+      width = main.width,
+      height = main.height,
+    })
+  end
+  if pins_open and pin and state.pin_win and api.nvim_win_is_valid(state.pin_win) then
+    pcall(api.nvim_win_set_config, state.pin_win, {
+      relative = "editor",
+      row = pin.row,
+      col = pin.col,
+      width = pin.width,
+      height = pin.height,
+    })
+  end
+  return main, pin
 end
 
 local function set_keymaps(buf)
@@ -177,9 +290,32 @@ local function set_keymaps(buf)
     M.set_cwd(vim.fn.getcwd())
   end)
   map(km.toggle_hidden, actions.toggle_hidden)
+  map(km.pin_toggle, M.focus_or_toggle_pins)
+  map(km.pin_add, actions.pin_add)
   map(km.close, M.close)
   map(km.help, actions.help)
   -- km.filter is reserved for v1.1; native "/" search works in the meantime.
+end
+
+-- Buffer-local keymaps for the pinned-locations pane. <CR>/l jumps the main view
+-- to the pin, the remove key drops it, <Tab> closes the pane, q/<Esc> closes all.
+local function set_pin_keymaps(buf)
+  local km = config.options.keymaps
+  local actions = require("yfp.actions")
+  local function map(lhs, fn)
+    if not lhs then
+      return
+    end
+    local list = (type(lhs) == "table") and lhs or { lhs }
+    for _, l in ipairs(list) do
+      vim.keymap.set("n", l, fn, { buffer = buf, nowait = true, silent = true })
+    end
+  end
+  map(km.enter, actions.pin_jump)
+  map(km.pin_remove, actions.pin_remove)
+  map(km.pin_toggle, M.close_pins)
+  map(km.close, M.close)
+  map(km.help, actions.help)
 end
 
 ---@param mode string
@@ -207,7 +343,8 @@ end
 
 --- Navigate the open explorer to `dir` (rescan + render).
 ---@param dir string
-function M.set_cwd(dir)
+---@param focus_name string|nil  place the cursor on this entry instead of the first
+function M.set_cwd(dir, focus_name)
   local state = M.state
   if not state then
     return
@@ -223,7 +360,11 @@ function M.set_cwd(dir)
   state.entries = entries
   render(state)
   set_winbar(state)
-  place_cursor_first(state)
+  if focus_name then
+    place_cursor_on(state, focus_name)
+  else
+    place_cursor_first(state)
+  end
 end
 
 --- The row under the cursor in the float, plus its line number.
@@ -235,6 +376,26 @@ function M.current_row()
   end
   local lnum = api.nvim_win_get_cursor(state.win)[1]
   return state.rows[lnum], lnum
+end
+
+--- The pin row under the cursor in the pinned pane, plus its line number. The
+--- line number equals the pin's index in the list (1:1, in order).
+---@return table|nil, integer|nil
+function M.current_pin_row()
+  local state = M.state
+  if not state or not (state.pin_win and api.nvim_win_is_valid(state.pin_win)) then
+    return nil
+  end
+  local lnum = api.nvim_win_get_cursor(state.pin_win)[1]
+  return (state.pin_rows or {})[lnum], lnum
+end
+
+--- Re-render the pinned pane if it is currently open (after add/remove).
+function M.refresh_pins()
+  local state = M.state
+  if state and state.pin_buf and api.nvim_buf_is_valid(state.pin_buf) then
+    render_pins(state)
+  end
 end
 
 ---@return boolean
@@ -271,13 +432,13 @@ function M.open(opts)
   api.nvim_set_option_value("swapfile", false, { buf = buf })
   api.nvim_set_option_value("filetype", "yfp", { buf = buf })
 
-  local width, height, row, col = geometry(cfg.window)
+  local main = compute_layout(cfg, false)
   local win = api.nvim_open_win(buf, true, {
     relative = "editor",
-    width = width,
-    height = height,
-    row = row,
-    col = col,
+    width = main.width,
+    height = main.height,
+    row = main.row,
+    col = main.col,
     style = "minimal",
     border = cfg.window.border,
     title = cfg.window.title,
@@ -292,6 +453,10 @@ function M.open(opts)
     rows = {},
     win = win,
     buf = buf,
+    pin_win = nil,
+    pin_buf = nil,
+    pin_rows = nil,
+    closing = false,
     origin_win = origin_win,
     origin_buf = origin_buf,
     origin_cursor = origin_cursor,
@@ -303,26 +468,153 @@ function M.open(opts)
   set_keymaps(buf)
   M.set_cwd(start)
 
+  -- One handler watches every window close while yfp is open (the pinned pane is
+  -- created later, so we can't pin a pattern to it up front). Closing the MAIN
+  -- float tears everything down; closing just the PANE restores the main float.
   local group = api.nvim_create_augroup("yfp", { clear = true })
   api.nvim_create_autocmd("WinClosed", {
     group = group,
-    pattern = tostring(win),
+    callback = function(args)
+      local st = M.state
+      if not st then
+        return
+      end
+      local closed = tonumber(args.match)
+      if st.closing then
+        if closed == st.win then
+          M.cleanup()
+        end
+        return
+      end
+      if closed == st.win then
+        M.cleanup()
+      elseif closed == st.pin_win then
+        st.pin_win, st.pin_buf, st.pin_rows = nil, nil, nil
+        if st.win and api.nvim_win_is_valid(st.win) then
+          relayout(st, false)
+          pcall(api.nvim_set_current_win, st.win)
+        end
+      end
+    end,
+  })
+  api.nvim_create_autocmd("VimResized", {
+    group = group,
     callback = function()
-      M.cleanup()
+      local st = M.state
+      if not st then
+        return
+      end
+      relayout(st, st.pin_win ~= nil and api.nvim_win_is_valid(st.pin_win))
     end,
   })
 end
 
---- Close the float (focus returns to the origin window automatically).
+--- Open (and focus) the pinned-locations pane beneath the main float.
+function M.open_pins()
+  local state = M.state
+  if not state or not M.is_open() then
+    return
+  end
+  if not config.options.pins.enabled then
+    vim.notify("yfp: pins are disabled (set pins.enabled = true)", vim.log.levels.INFO)
+    return
+  end
+  if state.pin_win and api.nvim_win_is_valid(state.pin_win) then
+    api.nvim_set_current_win(state.pin_win)
+    return
+  end
+  local cfg = config.options
+  local _, pin = relayout(state, true) -- shrink the main float to make room
+  local buf = api.nvim_create_buf(false, true)
+  api.nvim_set_option_value("buftype", "nofile", { buf = buf })
+  api.nvim_set_option_value("bufhidden", "wipe", { buf = buf })
+  api.nvim_set_option_value("swapfile", false, { buf = buf })
+  api.nvim_set_option_value("filetype", "yfp-pins", { buf = buf })
+  local win = api.nvim_open_win(buf, true, {
+    relative = "editor",
+    width = pin.width,
+    height = pin.height,
+    row = pin.row,
+    col = pin.col,
+    style = "minimal",
+    border = cfg.window.border,
+    title = cfg.pins.title,
+    title_pos = cfg.window.title_pos,
+  })
+  api.nvim_set_option_value("cursorline", true, { win = win })
+  api.nvim_set_option_value("wrap", false, { win = win })
+  state.pin_win = win
+  state.pin_buf = buf
+  set_pin_keymaps(buf)
+  render_pins(state)
+  pcall(api.nvim_win_set_cursor, win, { 1, 0 })
+end
+
+--- Close the pinned pane (keeping the main float open) and restore its height.
+function M.close_pins()
+  local state = M.state
+  if not state then
+    return
+  end
+  local win = state.pin_win
+  state.pin_win, state.pin_buf, state.pin_rows = nil, nil, nil
+  if win and api.nvim_win_is_valid(win) then
+    pcall(api.nvim_win_close, win, true)
+  end
+  if state.win and api.nvim_win_is_valid(state.win) then
+    relayout(state, false)
+    pcall(api.nvim_set_current_win, state.win)
+  end
+end
+
+--- Toggle the pinned pane open/closed.
+function M.toggle_pins()
+  local state = M.state
+  if not state then
+    return
+  end
+  if state.pin_win and api.nvim_win_is_valid(state.pin_win) then
+    M.close_pins()
+  else
+    M.open_pins()
+  end
+end
+
+--- From the main float (<Tab>): focus the pane if it is open, else open it.
+function M.focus_or_toggle_pins()
+  local state = M.state
+  if state and state.pin_win and api.nvim_win_is_valid(state.pin_win) then
+    api.nvim_set_current_win(state.pin_win)
+  else
+    M.open_pins()
+  end
+end
+
+--- Close the float (focus returns to the origin window automatically). Tears down
+--- the pinned pane too.
 function M.close()
   local state = M.state
-  if state and state.win and api.nvim_win_is_valid(state.win) then
-    pcall(api.nvim_win_close, state.win, true)
+  if state then
+    state.closing = true
+    if state.pin_win and api.nvim_win_is_valid(state.pin_win) then
+      pcall(api.nvim_win_close, state.pin_win, true)
+    end
+    if state.win and api.nvim_win_is_valid(state.win) then
+      pcall(api.nvim_win_close, state.win, true)
+    end
   end
   M.cleanup()
 end
 
 function M.cleanup()
+  local st = M.state
+  if not st then
+    return
+  end
+  st.closing = true
+  if st.pin_win and api.nvim_win_is_valid(st.pin_win) then
+    pcall(api.nvim_win_close, st.pin_win, true)
+  end
   M.state = nil
 end
 

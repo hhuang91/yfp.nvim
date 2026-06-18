@@ -121,11 +121,19 @@ split for clarity; can be collapsed if desired.
 ---@field type "file"|"directory"|"link"
 ---@field is_dir boolean
 
+---@class yfp.Pin
+---@field path string          -- absolute, forward-slash, e.g. "C:/Users/me/notes"
+---@field is_dir boolean       -- captured at pin time (drives jump + icon, avoids re-stat)
+
 ---@class yfp.State
 ---@field cwd string           -- current directory (absolute, forward-slash)
 ---@field entries yfp.Entry[]  -- sorted: dirs first, then files; case-insensitive
----@field win integer|nil      -- floating window id
----@field buf integer|nil      -- scratch buffer id
+---@field win integer|nil      -- main floating window id
+---@field buf integer|nil      -- main scratch buffer id
+---@field pin_win integer|nil  -- pinned-pane window id (nil when the pane is closed)
+---@field pin_buf integer|nil  -- pinned-pane scratch buffer id
+---@field pin_rows table[]|nil -- row map for the pinned pane (index == pin list index)
+---@field closing boolean      -- guard: a full teardown is in progress (suppresses relayout)
 ---@field origin_win integer   -- window to return focus to
 ---@field origin_buf integer   -- buffer to insert the path into
 ---@field origin_cursor integer[]  -- {row(1-based), col(0-based byte)} at open time
@@ -133,6 +141,9 @@ split for clarity; can be collapsed if desired.
 ---@field filter string        -- in-float fuzzy filter (v1.1)
 ---@field show_hidden boolean  -- runtime toggle
 ```
+
+The pin list itself lives in `pins.lua` (in-memory, loaded once from disk), not in `state` — it
+outlives any single explorer session. State only holds the *pane's* window/buffer while it's open.
 
 **Internal path invariant:** every path stored in state is **absolute and forward-slash**. Paths are
 canonicalized once on entry (join cwd + name, then `gsub("\\","/")`). Output re-applies the slash
@@ -195,6 +206,30 @@ end
 - If launched from **insert mode**, optionally `startinsert` afterward (`cfg.yank.keep_insert`).
 - `gy` = pick a path mode via `vim.ui.select`, then yank-and-paste.
 
+### 7.4 Pinned locations (a toggleable bottom pane)
+
+Quick-access bookmarks for files/folders, persisted across sessions. The pane is a **second float**
+stacked beneath the main one; the two are laid out as one centered block, so opening the pane
+shortens the main listing rather than growing the overall footprint (`compute_layout`/`relayout`).
+
+- **Toggle / focus** (`<Tab>`): from the main float, open the pane and focus it (or focus it if
+  already open); from the pane, `<Tab>` closes it again. The pane is created on first toggle.
+- **Pin** (`P`, in the main float): pin the entry under the cursor; on the `../` row, pin the current
+  directory. Stored as `{ path, is_dir }`. Adds are deduped (slash-normalized, trailing-slash-
+  stripped, case-folded) so the same place can't be pinned twice.
+- **Remove** (`x`/`dd`, in the pane): drop the pin under the cursor.
+- **Jump** (`<CR>`/`l`, in the pane): navigate the **main** view to the pin, then return focus to the
+  main float (the pane stays open for further jumps). A directory pin cd's into it; a file pin cd's to
+  its parent and lands the cursor on the file. A missing path notifies and is left in place (rendered
+  with a `[missing]` tag) rather than auto-removed.
+
+Persistence: the list is loaded once (lazily) from `stdpath("data")/yfp/pins.json` and rewritten on
+every add/remove via `persist.lua` (whole-file `vim.fn.writefile` of a `vim.json.encode`d array). The
+file is small; no debounce needed. Closing the main float tears the pane down too; closing only the
+pane (e.g. `:q` in it) restores the main float to full height. A single `WinClosed` handler keyed off
+the closed window id arbitrates, with a `state.closing` guard to avoid a relayout flash during a full
+close.
+
 ---
 
 ## 8. Read-only guarantee (a headline feature)
@@ -215,6 +250,16 @@ Three independent layers make modification *impossible*, not merely *disabled*:
 
 We also never shell out (`system`/`jobstart`) for filesystem work — drive enumeration uses `fs_stat`
 probing, not `wmic`/`fsutil` — so there is no escape hatch around the whitelist.
+
+**Scope of the guarantee, and the one exception.** "Read-only" is about the filesystem you *browse* —
+yfp can never create/rename/move/delete/chmod the files and folders it shows you. The **pinned
+locations** feature (§7.4) adds exactly one write: yfp's own state file at
+`stdpath("data")/yfp/pins.json`, the same kind of private state every plugin keeps (sessions, shada).
+It is confined to `lua/yfp/persist.lua`, uses `vim.fn.writefile`/`vim.fn.mkdir` (never a mutating
+`vim.uv` call), and only ever targets a path rooted at `stdpath("data")`. The CI grep enforces all
+three: mutating `vim.uv`/shell-outs are banned everywhere; host-side write helpers are banned
+everywhere *except* `persist.lua`; and `persist.lua` is asserted to derive its path from
+`stdpath("data")` and nothing else (no `getcwd`, `expand`, or other `stdpath` roots). See decision D6.
 
 ---
 
@@ -251,6 +296,15 @@ require("yfp").setup({
 
   source_dir = nil,            -- base for "relative_custom" (also via set_source_dir())
 
+  -- pinned locations (§7.4): a toggleable bottom pane, persisted to yfp's own
+  -- state file under stdpath("data") -- the only thing yfp ever writes (D6).
+  pins = {
+    enabled = true,
+    file    = nil,             -- default: stdpath("data").."/yfp/pins.json"
+    height  = 0.25,            -- bottom pane height: ratio of the window band, or integer rows
+    title   = " pinned ",
+  },
+
   icons = { enabled = true },  -- uses mini.icons / nvim-web-devicons IF present; text fallback else
 
   keymaps = {                  -- buffer-local, active only inside the float
@@ -267,6 +321,9 @@ require("yfp").setup({
     filter         = "/",      -- v1.1 in-float fuzzy filter
     close          = { "q", "<Esc>" },
     help           = "g?",
+    pin_toggle     = "<Tab>",  -- main: open/focus the pinned pane; pane: close it
+    pin_add        = "P",      -- main: pin the item under the cursor
+    pin_remove     = { "x", "dd" },  -- pane: remove the pin under the cursor
   },
 })
 ```
@@ -282,6 +339,7 @@ zero-dependency promise.
 | Stage | Feature | Notes |
 |---|---|---|
 | v1.0 | Read-only float explorer · browse anywhere · `y`=registers / `p`=paste · `/` normalize · drives view | Core. No deps. |
+| ✅ | **Pinned locations** — toggleable bottom pane (`<Tab>`), `P` to pin / `x` to remove / `<CR>` to jump | §7.4. Persists to `stdpath("data")/yfp/pins.json` (D6). Still no deps. |
 | v1.1 | **In-float fuzzy filter** (`/`) | "find sprinkled on top." Filters the current dir listing in-place; pure Lua, no deps. |
 | v1.2 | **Relative path modes** + `gy` menu | `relative_cwd` / `relative_buffer` / `relative_git` / `relative_custom`. Uses `vim.fs.relpath` (0.11+) with a manual fallback. This is the user's "advanced" feature. |
 | v1.3 | **Recursive find** | Async `vim.uv` walk under cwd → flat filtered list, still read-only, still `y`. Guard with max depth/results to stay snappy. |
@@ -301,7 +359,10 @@ zero-dependency promise.
 | Launched from insert mode | Cursor captured pre-command; insert at captured col; `startinsert` if `keep_insert`. |
 | Paths with spaces / multibyte | `nvim_buf_set_text` is byte-safe; optional quoting is a future config, not v1. |
 | yanky.nvim history | `setreg` doesn't push to yanky's ring; optional enhancement to fire `TextYankPost` or call yanky API (documented, not v1). |
-| `../` pseudo-row | Not yankable; `y`/`p` on it is a no-op + hint. |
+| `../` pseudo-row | Not yankable; `y`/`p` on it is a no-op + hint. Pinning on `../` pins the cwd. |
+| Pinned path deleted/unmounted | Kept in the list, rendered `[missing]`; jumping to it notifies instead of erroring. Not auto-pruned (a drive may be temporarily offline). |
+| Corrupt/missing `pins.json` | `persist.load` returns `{}` on unreadable/malformed JSON; malformed records are skipped, never crash. |
+| Pins file write fails (read-only data dir) | `persist.save` is best-effort: notifies and returns false; the in-memory list still works for the session. |
 
 ---
 
@@ -358,3 +419,12 @@ Suggested LazyVim mapping (add in `lua/plugins/yfp.lua`):
   off `<C-d>` (LazyVim scroll) to `D`; the now-redundant `yank.insert` flag was removed.
 - **2026-06-17** — D3 output slash handling is an explicit final `gsub("\\","/")`, not
   `vim.fs.normalize`, to stay literal and avoid surprising `~`/`$VAR`/`..` expansion.
+- **2026-06-18** — D6 *pinned locations persist to yfp's own state file*
+  (`stdpath("data")/yfp/pins.json`), written only by `persist.lua`. Considered (a) an own state file
+  + documented carve-out, (b) purist "no yfp writes" (expose `get/set` and let the user's session
+  persist), (c) in-memory only. Chose (a): the read-only headline is about the *browsed* filesystem;
+  a private state file is normal (sessions/shada) and far less clunky than (b), while (c) drops the
+  "persists across sessions" requirement. Kept honest by scoping the guarantee in §8 and tightening
+  the CI grep to confine writes to `persist.lua` → `stdpath("data")`. UI form chosen: a toggleable
+  **bottom pane** (a second float), over a side pane (more layout churn) or a `vim.ui.select`
+  quick-jump (no navigable buffer; can't `l`/remove in place).

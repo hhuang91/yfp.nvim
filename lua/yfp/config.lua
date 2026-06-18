@@ -28,6 +28,17 @@ M.defaults = {
 
   source_dir = nil, -- base directory for the "relative_custom" mode
 
+  -- Pinned locations: a toggleable bottom pane of saved files/folders for quick
+  -- navigation. Persisted to yfp's OWN state file under stdpath("data") -- the
+  -- only thing yfp ever writes (see DESIGN.md D6); the browsed filesystem stays
+  -- strictly read-only.
+  pins = {
+    enabled = true,
+    file = nil, -- default: stdpath("data").."/yfp/pins.json" (set a path to override)
+    height = 0.25, -- bottom pane height: ratio of the window band, or integer rows
+    title = " pinned ",
+  },
+
   icons = { enabled = true }, -- uses mini.icons / nvim-web-devicons if present
 
   keymaps = {
@@ -44,6 +55,10 @@ M.defaults = {
     filter = "/", -- reserved for v1.1; native "/" search works meanwhile
     close = { "q", "<Esc>" },
     help = "g?",
+    -- pinned locations
+    pin_toggle = "<Tab>", -- main: open/focus the pinned pane; pane: close it
+    pin_add = "P", -- main: pin the item under the cursor
+    pin_remove = { "x", "dd" }, -- pane: remove the pin under the cursor
   },
 }
 

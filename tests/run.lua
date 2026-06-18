@@ -8,6 +8,8 @@ require("yfp.config")
 require("yfp.fs")
 require("yfp.explorer")
 require("yfp.actions")
+require("yfp.persist")
+require("yfp.pins")
 
 -- 2) pure path logic
 local path = require("yfp.path")
@@ -64,6 +66,32 @@ eq(#config.options.keymaps.enter, 1, "keymap list replaced, not appended")
 eq(config.options.keymaps.up[1], "-", "other keymap defaults preserved")
 
 config.setup({}) -- reset to defaults
+
+-- pins: add / dedupe / remove / persistence round-trip.
+-- Use a temp file, NOT the real stdpath("data") pins file.
+local pins = require("yfp.pins")
+local pinfile = (vim.fn.tempname():gsub("\\", "/")) .. "-pins.json"
+config.setup({ pins = { file = pinfile } })
+pins.reset()
+eq(#pins.list(), 0, "pins start empty")
+eq(pins.add({ path = "C:/tmp/a", is_dir = true }), true, "add a new pin")
+eq(pins.add({ path = "C:/tmp/a", is_dir = true }), false, "dedupe an identical pin")
+eq(pins.add({ path = [[C:\tmp\a\]], is_dir = true }), false, "dedupe across separators")
+eq(#pins.list(), 1, "still one pin after dedupe")
+pins.add({ path = "C:/tmp/b.txt", is_dir = false })
+eq(#pins.list(), 2, "second pin added")
+eq(pins.list()[1].path, "C:/tmp/a", "stored path is slash-normalized")
+pins.reset() -- force a reload from disk
+eq(#pins.list(), 2, "pins persisted and reloaded")
+eq(pins.list()[2].is_dir, false, "is_dir flag round-trips")
+eq(pins.remove(1) ~= nil, true, "remove returns the item")
+eq(#pins.list(), 1, "one pin left after remove")
+pins.reset()
+eq(#pins.list(), 1, "removal persisted")
+eq(pins.list()[1].path, "C:/tmp/b.txt", "the surviving pin is correct")
+pcall(vim.fn.delete, pinfile)
+config.setup({}) -- reset to defaults
+pins.reset()
 
 if fails > 0 then
   io.stderr:write(("yfp: %d test(s) failed\n"):format(fails))

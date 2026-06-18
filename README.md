@@ -32,9 +32,12 @@ backslashes for anything else. `yfp` fixes the whole loop without leaving the ke
 - 🌍 **Browse anywhere** — not limited to cwd or git root; jump to any folder or **another drive**
   (`D:/`, UNC shares) without leaving the float.
 - 🔒 **Strictly read-only — by construction.** `yfp` *cannot* create, rename, move, delete, or chmod
-  anything. It only ever calls read-only filesystem APIs, and a CI test enforces it. Safe to poke at.
+  the files you browse. It only ever calls read-only filesystem APIs, and a CI test enforces it. (The
+  one thing it writes is its own pinned-locations list under your Neovim data dir — never your files.)
 - 📋 **One job, done well:** press `p` on a file/folder to **paste** its path at your cursor *and*
   set the `"`/`+` registers, or `y` to set the registers only (Vim-style) — always `/`-normalized.
+- 📌 **Pinned locations.** Bookmark files/folders in a toggleable bottom pane (`<Tab>`), jump straight
+  back to any of them, and have the list persist across sessions.
 - 🧩 **Zero dependencies.** No telescope, no snacks, no plenary. Pure Neovim stdlib.
 - ⌨️ **Keyboard-only.** The mouse stays untouched.
 
@@ -107,12 +110,37 @@ Clone, then point lazy.nvim at the local copy:
 | `~` | Jump to home |
 | `=` | Jump to original working directory |
 | `.` | Toggle hidden files |
+| `<Tab>` | Toggle the **pinned locations** pane (open & focus it, or close it) |
+| `P` | **Pin** the file/folder under the cursor |
+| `x` / `dd` | Remove the pin under the cursor *(inside the pinned pane)* |
+| `<CR>` / `l` | *(in the pinned pane)* jump the main view to that pin |
 | `/` | Fuzzy-filter the current listing *(v1.1)* |
 | `q` / `<Esc>` | Close |
 | `g?` | Help |
 
 `<C-d>` / `<C-u>` keep their native half-page scroll inside the float. All keys are remappable — see
 `keymaps` in Configuration.
+
+---
+
+## Pinned locations
+
+Keep a short list of folders (and files) you reach for often, and jump back to them without
+re-navigating:
+
+1. In the explorer, put the cursor on a file or folder and press **`P`** to pin it. (On the `../`
+   row, `P` pins the current folder.)
+2. Press **`<Tab>`** to open a **pinned** pane along the bottom of the float (and focus it). `<Tab>`
+   again closes it.
+3. In the pane, press **`<CR>`** / **`l`** on a pin to send the main view there — a folder opens, a
+   file opens its folder with the cursor on the file — and focus hops back to the main view (the pane
+   stays open). Press **`x`** (or `dd`) to remove the pin under the cursor.
+
+The list is saved to `stdpath("data")/yfp/pins.json` (e.g. `~/AppData/Local/nvim-data/yfp/pins.json`
+on Windows) and reloaded on the next session — it's the **only** file `yfp` ever writes, and it's
+yfp's own state, never your project files. Set `pins.file` to relocate it, or `pins.enabled = false`
+to turn the feature off. Stale pins (deleted/unmounted paths) are shown with a `[missing]` tag and
+left alone until you remove them.
 
 ---
 
@@ -149,6 +177,13 @@ require("yfp").setup({
 
   source_dir = nil,            -- base directory for "relative_custom"
 
+  pins = {                     -- pinned locations (toggleable bottom pane)
+    enabled = true,
+    file    = nil,             -- default: stdpath("data").."/yfp/pins.json"
+    height  = 0.25,            -- pane height: ratio of the window, or integer rows
+    title   = " pinned ",
+  },
+
   icons = { enabled = true },  -- uses mini.icons / nvim-web-devicons if present; text fallback else
 
   keymaps = {
@@ -165,6 +200,9 @@ require("yfp").setup({
     filter         = "/",
     close          = { "q", "<Esc>" },
     help           = "g?",
+    pin_toggle     = "<Tab>",         -- main: open/focus the pinned pane; pane: close it
+    pin_add        = "P",             -- main: pin the item under the cursor
+    pin_remove     = { "x", "dd" },   -- pane: remove the pin under the cursor
   },
 })
 ```
@@ -208,13 +246,19 @@ yfp.set_source_dir("C:/Users/you/project")  -- base for relative_custom
 `yfp` is read-only *by construction*, not by hiding buttons:
 
 1. The explorer buffer is **non-modifiable** (`buftype=nofile`, `modifiable=false`).
-2. A single module is allowed to touch the filesystem, and only via **read-only** `vim.uv`
+2. A single module is allowed to touch the **browsed** filesystem, and only via **read-only** `vim.uv`
    functions (`fs_scandir`, `fs_stat`, `fs_lstat`, `fs_realpath`, `fs_readlink`, `fs_access`).
 3. A **CI test** greps the source and fails the build if any mutating call
    (`fs_unlink`, `fs_rename`, `fs_mkdir`, `fs_rmdir`, `fs_write`, …) ever appears.
 4. It **never shells out** for filesystem work.
 
-So there is no path — UI or code — through which `yfp` can change your files.
+So there is no path — UI or code — through which `yfp` can change **your files**.
+
+The one and only thing `yfp` writes is its own pinned-locations list at
+`stdpath("data")/yfp/pins.json` — the same kind of private state Neovim keeps for sessions and shada.
+That write lives entirely in one module (`persist.lua`), uses ordinary `writefile`/`mkdir` (never a
+mutating `vim.uv` call), and the same CI test asserts it can only ever target a path under
+`stdpath("data")`. Your project files stay untouched.
 
 ---
 
@@ -243,6 +287,7 @@ it to `{ '"' }` to leave the system clipboard alone, or `{}` so only `p`'s paste
 
 ## Roadmap
 
+- **Recently added** — pinned locations: a toggleable bottom pane, persisted across sessions.
 - **v1.1** — in-float fuzzy filter (`/`) — the "find sprinkled on top."
 - **v1.2** — relative path modes + the `gy` format menu.
 - **v1.3** — recursive find (async, still read-only).
@@ -258,7 +303,9 @@ See [DESIGN.md](./DESIGN.md) for the full design and rationale.
 Issues and PRs welcome. Please keep the two invariants intact:
 
 1. **Zero runtime dependencies.**
-2. **Read-only** — no mutating `vim.uv` calls (the CI grep will reject them).
+2. **Read-only over the browsed filesystem** — no mutating `vim.uv` calls and no shell-outs (the CI
+   grep will reject them). The sole permitted write is yfp's own `pins.json`, confined to
+   `persist.lua` and `stdpath("data")` — the CI grep enforces that too.
 
 Run `stylua` and `luacheck` before submitting. See [CLAUDE.md](./CLAUDE.md) for the developer map.
 

@@ -35,4 +35,44 @@ print("REGISTER = " .. tostring(vim.fn.getreg('"')))
 assert(after == "", "registers-only yank must not modify the buffer")
 assert(vim.fn.getreg('"') == expected, "registers-only yank must set the register")
 
+-- 3) pinned pane: pin -> toggle the bottom float -> jump -> remove -> persist
+local exp = require("yfp.explorer")
+local pins = require("yfp.pins")
+local sub = tmp .. "/sub"
+vim.fn.mkdir(sub, "p")
+local pinfile = tmp .. "-pins.json"
+yfp.setup({ yank = { registers = {} }, pins = { file = pinfile } })
+pins.reset()
+
+vim.api.nvim_buf_set_lines(0, 0, -1, false, { "" })
+yfp.open({ cwd = tmp })
+-- entries sort dirs-first: row 2 = "sub/", row 3 = "alpha.txt"
+vim.api.nvim_win_set_cursor(exp.state.win, { 2, 0 })
+actions.pin_add()
+assert(#pins.list() == 1, "pin_add must add one pin")
+assert(pins.list()[1].path == sub, "must pin the subdir path")
+
+exp.toggle_pins()
+assert(exp.state.pin_win and vim.api.nvim_win_is_valid(exp.state.pin_win), "pinned pane must open")
+local pline = vim.api.nvim_buf_get_lines(exp.state.pin_buf, 0, 1, false)[1]
+assert(not pline:find("\\", 1, true), "pane path must not contain backslashes")
+
+vim.api.nvim_win_set_cursor(exp.state.pin_win, { 1, 0 })
+actions.pin_jump()
+assert(exp.state.cwd == sub, "pin_jump must navigate the main view into the pin")
+assert(vim.api.nvim_get_current_win() == exp.state.win, "focus must return to the main float")
+
+vim.api.nvim_set_current_win(exp.state.pin_win)
+vim.api.nvim_win_set_cursor(exp.state.pin_win, { 1, 0 })
+actions.pin_remove()
+assert(#pins.list() == 0, "pin_remove must empty the list")
+
+yfp.close()
+assert(not yfp.is_open(), "the whole UI must close cleanly")
+pins.reset()
+assert(#pins.list() == 0, "removal must persist across a reload")
+pcall(vim.fn.delete, pinfile)
+yfp.setup({})
+print("yfp: pinned-pane add/toggle/jump/remove + persistence tests passed")
+
 print("yfp: functional yank_and_paste + registers-only tests passed")

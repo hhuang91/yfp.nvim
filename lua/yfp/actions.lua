@@ -112,13 +112,26 @@ function M.yank_and_paste(mode)
   do_yank(mode, true)
 end
 
-function M.yank_menu()
+-- Pick a path format via vim.ui.select, then run the chosen yank (registers
+-- only when insert=false, registers + paste when insert=true).
+local function do_menu(insert)
   local modes = { "absolute", "relative_cwd", "relative_buffer", "relative_git", "relative_custom" }
-  vim.ui.select(modes, { prompt = "yfp: path format" }, function(choice)
+  local prompt = insert and "yfp: paste path as" or "yfp: yank path as"
+  vim.ui.select(modes, { prompt = prompt }, function(choice)
     if choice then
-      M.yank_and_paste(choice)
+      do_yank(choice, insert)
     end
   end)
+end
+
+--- Pick a path format, then yank to registers (no paste) -- the menu form of `y`.
+function M.yank_menu()
+  do_menu(false)
+end
+
+--- Pick a path format, then yank AND paste at the cursor -- the menu form of `p`.
+function M.yank_and_paste_menu()
+  do_menu(true)
 end
 
 function M.enter()
@@ -300,7 +313,8 @@ function M.help()
     "yfp — keys inside the float:",
     ("  %-12s yank to registers only"):format(f(km.yank)),
     ("  %-12s yank AND paste at the cursor"):format(f(km.yank_and_paste)),
-    ("  %-12s yank, choosing a path format"):format(f(km.yank_menu)),
+    ("  %-12s yank (registers), pick a format"):format(f(km.yank_menu)),
+    ("  %-12s yank AND paste, pick a format"):format(f(km.yank_and_paste_menu)),
     ("  %-12s enter directory"):format(f(km.enter)),
     ("  %-12s go up"):format(f(km.up)),
     ("  %-12s go to a typed path"):format(f(km.goto_path)),

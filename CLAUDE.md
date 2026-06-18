@@ -46,8 +46,9 @@ lua/yfp/
   explorer.lua   Float window(s) + scratch buffer lifecycle; render; cursor; buffer-local keymaps;
                  captures origin (win/buf/cursor/mode) at open; owns the bottom "pinned" pane
                  (second float). NO filesystem writes.
-  actions.lua    Handlers: yank (registers), yank_and_paste (paste + registers), yank_menu, enter,
-                 up, goto_path, drives, toggle_hidden, pin_add/pin_remove/pin_jump. Reads via fs.lua.
+  actions.lua    Handlers: yank (registers), yank_and_paste (paste + registers),
+                 yank_menu/yank_and_paste_menu (gy/gp format pickers), enter, up, goto_path, drives,
+                 toggle_hidden, pin_add/pin_remove/pin_jump. Reads via fs.lua.
   fs.lua         THE ONLY module that calls vim.uv — read-only functions only.
   path.lua       Pure functions: join, slash-normalize, relative-to-{cwd,buffer,git,custom}.
   pins.lua       In-memory pinned-locations list: add/remove/dedupe. NO direct I/O (delegates).
@@ -101,8 +102,8 @@ There is no build step — it's Lua loaded by Neovim.
 - **Add a keymap:** add a default to `config.keymaps`, document it in README's keymap table and
   `doc/yfp.txt`, and wire the handler in `explorer.lua`'s keymap installer → `actions.lua`.
 - **Add a path mode:** implement a pure function in `path.lua`, add it to `yank.default_mode` and the
-  `gy` menu, ensure the final `gsub("\\","/")` still runs, add a unit test. Update both docs' mode
-  tables.
+  `gy`/`gp` menu list (`do_menu` in `actions.lua`), ensure the final `gsub("\\","/")` still runs, add
+  a unit test. Update both docs' mode tables.
 - **Add a config option:** default in `config.lua` with a `---@field` annotation, merge logic if
   non-trivial, document in README's config block + DESIGN.md §9.
 - **Touch the filesystem:** only inside `fs.lua`, only read-only calls. If you think you need a write

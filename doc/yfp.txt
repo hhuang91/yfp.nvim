@@ -35,7 +35,8 @@ Inside the float (all remappable via the `keymaps` option):
 
     y           yank path to registers only (", +) -- Vim-like
     p           yank AND paste the path at the cursor (also sets registers)
-    gy          yank-and-paste, choosing a path format (absolute / relative...)
+    gy          yank to registers, choosing a path format (absolute/relative)
+    gp          yank AND paste, choosing a path format
     <CR> / l    enter directory
     - / h       go up (drives view at a drive root, Windows)
     <C-g>       go to a typed path (any folder / drive / ~)

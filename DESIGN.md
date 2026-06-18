@@ -106,7 +106,9 @@ split for clarity; can be collapsed if desired.
 | `init.lua` | `setup`, `open`, `close`, `toggle`, `is_open`, `set_source_dir`, holds singleton state | No |
 | `config.lua` | Default options table + deep-merge of user opts; type annotations | No |
 | `explorer.lua` | Create/destroy the float window + scratch buffer; render lines; manage cursor; install buffer-local keymaps; capture origin (win/buf/cursor/mode) | No |
-| `actions.lua` | `yank` (registers), `yank_and_paste` (paste + registers), `yank_menu`, `enter`, `up`, `goto_path`, `drives`, `toggle_hidden` | No (delegates reads to `fs`) |
+| `actions.lua` | `yank` / `yank_and_paste`, `yank_menu` / `yank_and_paste_menu` (gy/gp), `enter`, `up`, `goto_path`, `drives`, `toggle_hidden`, `pin_add` / `pin_remove` / `pin_jump` | No (delegates reads to `fs`) |
+| `pins.lua` | In-memory pinned-locations list: load / add / remove / dedupe | No (delegates I/O to `persist`) |
+| `persist.lua` | Read & write yfp's own `pins.json` under `stdpath("data")` | **Write** — its own state file only |
 | `fs.lua` | The **only** module that calls `vim.uv` — and only its **read** functions | **Read-only** |
 | `path.lua` | Pure functions: join, slash-normalize, relative-to-X computation | No |
 
@@ -204,7 +206,8 @@ end
 - **Insert position** is configurable: `at_cursor` (drops exactly where the cursor was,
   as if typed) or `after_cursor` (default — paste-like, mimics `p`).
 - If launched from **insert mode**, optionally `startinsert` afterward (`cfg.yank.keep_insert`).
-- `gy` = pick a path mode via `vim.ui.select`, then yank-and-paste.
+- `gy` = pick a path mode via `vim.ui.select`, then yank to registers (the menu form of `y`); `gp` =
+  pick a mode, then yank-and-paste (the menu form of `p`). Both route through the same `do_yank`.
 
 ### 7.4 Pinned locations (a toggleable bottom pane)
 
@@ -307,23 +310,24 @@ require("yfp").setup({
 
   icons = { enabled = true },  -- uses mini.icons / nvim-web-devicons IF present; text fallback else
 
-  keymaps = {                  -- buffer-local, active only inside the float
-    yank           = "y",      -- registers only (Vim-like)
-    yank_and_paste = "p",      -- insert at cursor + set registers
-    yank_menu      = "gy",
-    enter          = { "<CR>", "l" },
-    up             = { "-", "h" },
-    goto_path      = "<C-g>",
-    drives         = "D",
-    home           = "~",
-    cwd            = "=",
-    toggle_hidden  = ".",
-    filter         = "/",      -- v1.1 in-float fuzzy filter
-    close          = { "q", "<Esc>" },
-    help           = "g?",
-    pin_toggle     = "<Tab>",  -- main: open/focus the pinned pane; pane: close it
-    pin_add        = "P",      -- main: pin the item under the cursor
-    pin_remove     = { "x", "dd" },  -- pane: remove the pin under the cursor
+  keymaps = {                       -- buffer-local, active only inside the float
+    yank                = "y",      -- registers only (Vim-like)
+    yank_and_paste      = "p",      -- insert at cursor + set registers
+    yank_menu           = "gy",     -- pick a path format, then yank to registers
+    yank_and_paste_menu = "gp",     -- pick a path format, then yank + paste
+    enter               = { "<CR>", "l" },
+    up                  = { "-", "h" },
+    goto_path           = "<C-g>",
+    drives              = "D",
+    home                = "~",
+    cwd                 = "=",
+    toggle_hidden       = ".",
+    filter              = "/",      -- v1.1 in-float fuzzy filter
+    close               = { "q", "<Esc>" },
+    help                = "g?",
+    pin_toggle          = "<Tab>",  -- main: open/focus the pinned pane; pane: close it
+    pin_add             = "P",      -- main: pin the item under the cursor
+    pin_remove          = { "x", "dd" },  -- pane: remove the pin under the cursor
   },
 })
 ```

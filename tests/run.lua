@@ -47,6 +47,8 @@ eq(#config.options.yank.registers, 2, "setup({}) keeps default registers")
 eq(config.options.yank.default_mode, "absolute", "setup({}) keeps yank defaults")
 eq(config.options.keymaps.yank, "y", "default yank key")
 eq(config.options.keymaps.yank_and_paste, "p", "default yank_and_paste key")
+eq(config.options.keymaps.yank_menu, "gy", "default yank_menu key (registers only)")
+eq(config.options.keymaps.yank_and_paste_menu, "gp", "default yank_and_paste_menu key")
 eq(config.options.keymaps.drives, "D", "default drives key")
 
 -- list options replace wholesale rather than index-merge

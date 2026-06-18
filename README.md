@@ -102,7 +102,8 @@ Clone, then point lazy.nvim at the local copy:
 |---|---|
 | `y` | **Yank** path to registers (`"`, `+`) — Vim-style, no paste |
 | `p` | **Yank and paste** the path at your cursor (also sets registers) |
-| `gy` | Pick a path format (absolute / relative…) then yank-and-paste |
+| `gy` | Pick a path format (absolute / relative…), then **yank** to registers |
+| `gp` | Pick a path format, then **yank and paste** at the cursor |
 | `<CR>` / `l` | Enter directory |
 | `-` / `h` | Go up (drives view at a drive root) |
 | `<C-g>` | Go to a typed path (any folder / drive / `~`) |
@@ -187,29 +188,30 @@ require("yfp").setup({
   icons = { enabled = true },  -- uses mini.icons / nvim-web-devicons if present; text fallback else
 
   keymaps = {
-    yank           = "y",   -- registers only (Vim-like)
-    yank_and_paste = "p",   -- insert at the cursor + set registers
-    yank_menu      = "gy",
-    enter          = { "<CR>", "l" },
-    up             = { "-", "h" },
-    goto_path      = "<C-g>",
-    drives         = "D",
-    home           = "~",
-    cwd            = "=",
-    toggle_hidden  = ".",
-    filter         = "/",
-    close          = { "q", "<Esc>" },
-    help           = "g?",
-    pin_toggle     = "<Tab>",         -- main: open/focus the pinned pane; pane: close it
-    pin_add        = "P",             -- main: pin the item under the cursor
-    pin_remove     = { "x", "dd" },   -- pane: remove the pin under the cursor
+    yank                = "y",    -- registers only (Vim-like)
+    yank_and_paste      = "p",    -- insert at the cursor + set registers
+    yank_menu           = "gy",   -- pick a path format, then yank to registers
+    yank_and_paste_menu = "gp",   -- pick a path format, then yank + paste
+    enter               = { "<CR>", "l" },
+    up                  = { "-", "h" },
+    goto_path           = "<C-g>",
+    drives              = "D",
+    home                = "~",
+    cwd                 = "=",
+    toggle_hidden       = ".",
+    filter              = "/",
+    close               = { "q", "<Esc>" },
+    help                = "g?",
+    pin_toggle          = "<Tab>",        -- main: open/focus the pinned pane; pane: close it
+    pin_add             = "P",            -- main: pin the item under the cursor
+    pin_remove          = { "x", "dd" },  -- pane: remove the pin under the cursor
   },
 })
 ```
 
 ### Path output modes
 
-`yank.default_mode` (and the `gy` menu) control what gets written:
+`yank.default_mode` (and the `gy` / `gp` menus) control what gets written:
 
 | Mode | Result | Status |
 |---|---|---|

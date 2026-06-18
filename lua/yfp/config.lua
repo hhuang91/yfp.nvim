@@ -57,9 +57,10 @@ M.defaults = {
     close = { "q", "<Esc>" },
     help = "g?",
     -- pinned locations
-    pin_toggle = "<Tab>", -- main: open/focus the pinned pane; pane: close it
-    pin_add = "P", -- main: pin the item under the cursor
-    pin_remove = { "x", "dd" }, -- pane: remove the pin under the cursor
+    pin_toggle = "P", -- toggle the pinned panel open/closed (from either side)
+    pin_focus = "<Tab>", -- switch focus between the main view and the panel
+    pin_add = "a", -- main: pin the item under the cursor (only while the panel is open)
+    pin_remove = "d", -- panel: remove the pin under the cursor
   },
 }
 

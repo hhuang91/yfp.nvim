@@ -50,6 +50,10 @@ eq(config.options.keymaps.yank_and_paste, "p", "default yank_and_paste key")
 eq(config.options.keymaps.yank_menu, "gy", "default yank_menu key (registers only)")
 eq(config.options.keymaps.yank_and_paste_menu, "gp", "default yank_and_paste_menu key")
 eq(config.options.keymaps.drives, "D", "default drives key")
+eq(config.options.keymaps.pin_toggle, "P", "default pin_toggle key")
+eq(config.options.keymaps.pin_focus, "<Tab>", "default pin_focus key")
+eq(config.options.keymaps.pin_add, "a", "default pin_add key")
+eq(config.options.keymaps.pin_remove, "d", "default pin_remove key")
 
 -- list options replace wholesale rather than index-merge
 config.setup({ yank = { registers = { "+" } } })

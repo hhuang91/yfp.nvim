@@ -215,12 +215,16 @@ Quick-access bookmarks for files/folders, persisted across sessions. The pane is
 stacked beneath the main one; the two are laid out as one centered block, so opening the pane
 shortens the main listing rather than growing the overall footprint (`compute_layout`/`relayout`).
 
-- **Toggle / focus** (`<Tab>`): from the main float, open the pane and focus it (or focus it if
-  already open); from the pane, `<Tab>` closes it again. The pane is created on first toggle.
-- **Pin** (`P`, in the main float): pin the entry under the cursor; on the `../` row, pin the current
-  directory. Stored as `{ path, is_dir }`. Adds are deduped (slash-normalized, trailing-slash-
-  stripped, case-folded) so the same place can't be pinned twice.
-- **Remove** (`x`/`dd`, in the pane): drop the pin under the cursor.
+- **Toggle** (`P`, from either float): open or close the pane — the *only* control for its
+  visibility. Opening keeps focus in the main float (so you can keep browsing and pin); the pane is
+  created on first open.
+- **Focus** (`<Tab>`, from either float): switch focus between the main float and the pane. It never
+  opens or closes the pane (no-op when the pane is closed), keeping visibility and focus separate.
+- **Pin** (`a`, in the main float, only while the pane is open): pin the entry under the cursor; on
+  the `../` row, pin the current directory. Stored as `{ path, is_dir }`. Adds are deduped (slash-
+  normalized, trailing-slash-stripped, case-folded) so the same place can't be pinned twice. With the
+  pane closed, `a` notifies and does nothing.
+- **Remove** (`d`, in the pane): drop the pin under the cursor.
 - **Jump** (`<CR>`/`l`, in the pane): navigate the **main** view to the pin, then return focus to the
   main float (the pane stays open for further jumps). A directory pin cd's into it; a file pin cd's to
   its parent and lands the cursor on the file. A missing path notifies and is left in place (rendered
@@ -325,9 +329,10 @@ require("yfp").setup({
     filter              = "/",      -- v1.1 in-float fuzzy filter
     close               = { "q", "<Esc>" },
     help                = "g?",
-    pin_toggle          = "<Tab>",  -- main: open/focus the pinned pane; pane: close it
-    pin_add             = "P",      -- main: pin the item under the cursor
-    pin_remove          = { "x", "dd" },  -- pane: remove the pin under the cursor
+    pin_toggle          = "P",      -- toggle the pinned pane open/closed (either side)
+    pin_focus           = "<Tab>",  -- switch focus between the main view and the pane
+    pin_add             = "a",      -- pin the item under the cursor (pane must be open)
+    pin_remove          = "d",      -- remove the pin under the cursor (in the pane)
   },
 })
 ```

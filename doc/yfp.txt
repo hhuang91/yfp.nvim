@@ -44,10 +44,11 @@ Inside the float (all remappable via the `keymaps` option):
     ~           jump to home
     =           jump to the working directory
     .           toggle hidden files
-    <Tab>       toggle the pinned-locations pane (focus it / close it)
-    P           pin the file/folder under the cursor (main view)
-    x / dd      remove the pin under the cursor (pinned pane)
-    <CR> / l    in the pinned pane: jump the main view to that pin
+    P           toggle the pinned-locations panel (open / close)
+    <Tab>       switch focus between the main view and the panel
+    a           pin the file/folder under the cursor (while the panel is open)
+    d           remove the pin under the cursor (in the panel)
+    <CR> / l    in the panel: jump the main view to that pin
     q / <Esc>   close
     g?          help
 
@@ -57,15 +58,17 @@ PINNED LOCATIONS                                                   *yfp-pins*
 Keep quick-access bookmarks of folders/files and jump back to them without
 re-navigating.
 
-    P           Pin the item under the cursor (the cwd itself on the "../"
-                row). Duplicates are ignored.
-    <Tab>       Toggle a "pinned" pane along the bottom of the float. From the
-                main view it opens and focuses the pane; from the pane it
-                closes it.
-    <CR> / l    (in the pane) jump the main view to the pin: a folder opens, a
-                file opens its parent with the cursor on the file. Focus
-                returns to the main view; the pane stays open.
-    x / dd      (in the pane) remove the pin under the cursor.
+    P           Toggle the "pinned" panel along the bottom of the float (open
+                or close). The only control for the panel's visibility;
+                opening keeps focus in the main view.
+    <Tab>       Switch focus between the main view and the panel. Never opens
+                or closes it -- that is P's job.
+    a           Pin the item under the cursor (the cwd itself on the "../"
+                row), while the panel is open. Duplicates are ignored.
+    d           (in the panel) remove the pin under the cursor.
+    <CR> / l    (in the panel) jump the main view to the pin: a folder opens,
+                a file opens its parent with the cursor on the file. Focus
+                returns to the main view; the panel stays open.
 
 The list persists to a JSON file in your Neovim data dir
 (stdpath("data").."/yfp/pins.json" by default) and is reloaded next session.

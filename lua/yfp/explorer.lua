@@ -291,7 +291,8 @@ local function set_keymaps(buf)
     M.set_cwd(vim.fn.getcwd())
   end)
   map(km.toggle_hidden, actions.toggle_hidden)
-  map(km.pin_toggle, M.focus_or_toggle_pins)
+  map(km.pin_toggle, M.toggle_pins)
+  map(km.pin_focus, M.focus_pins)
   map(km.pin_add, actions.pin_add)
   map(km.close, M.close)
   map(km.help, actions.help)
@@ -299,7 +300,8 @@ local function set_keymaps(buf)
 end
 
 -- Buffer-local keymaps for the pinned-locations pane. <CR>/l jumps the main view
--- to the pin, the remove key drops it, <Tab> closes the pane, q/<Esc> closes all.
+-- to the pin, the remove key drops it, pin_toggle (P) closes the panel, pin_focus
+-- (<Tab>) switches focus back to the main view, q/<Esc> closes everything.
 local function set_pin_keymaps(buf)
   local km = config.options.keymaps
   local actions = require("yfp.actions")
@@ -314,7 +316,8 @@ local function set_pin_keymaps(buf)
   end
   map(km.enter, actions.pin_jump)
   map(km.pin_remove, actions.pin_remove)
-  map(km.pin_toggle, M.close_pins)
+  map(km.pin_toggle, M.toggle_pins)
+  map(km.pin_focus, M.focus_pins)
   map(km.close, M.close)
   map(km.help, actions.help)
 end
@@ -510,8 +513,11 @@ function M.open(opts)
   })
 end
 
---- Open (and focus) the pinned-locations pane beneath the main float.
-function M.open_pins()
+--- Open the pinned-locations pane beneath the main float. Focus stays in the
+--- main view unless `focus` is true; opening/closing is driven by `pin_toggle`
+--- and switching focus by `pin_focus`, so the two concerns stay separate.
+---@param focus boolean|nil
+function M.open_pins(focus)
   local state = M.state
   if not state or not M.is_open() then
     return
@@ -521,7 +527,9 @@ function M.open_pins()
     return
   end
   if state.pin_win and api.nvim_win_is_valid(state.pin_win) then
-    api.nvim_set_current_win(state.pin_win)
+    if focus then
+      api.nvim_set_current_win(state.pin_win)
+    end
     return
   end
   local cfg = config.options
@@ -531,7 +539,7 @@ function M.open_pins()
   api.nvim_set_option_value("bufhidden", "wipe", { buf = buf })
   api.nvim_set_option_value("swapfile", false, { buf = buf })
   api.nvim_set_option_value("filetype", "yfp-pins", { buf = buf })
-  local win = api.nvim_open_win(buf, true, {
+  local win = api.nvim_open_win(buf, focus == true, {
     relative = "editor",
     width = pin.width,
     height = pin.height,
@@ -568,7 +576,7 @@ function M.close_pins()
   end
 end
 
---- Toggle the pinned pane open/closed.
+--- Toggle the pinned pane open/closed. Opening keeps focus in the main view.
 function M.toggle_pins()
   local state = M.state
   if not state then
@@ -577,17 +585,21 @@ function M.toggle_pins()
   if state.pin_win and api.nvim_win_is_valid(state.pin_win) then
     M.close_pins()
   else
-    M.open_pins()
+    M.open_pins(false)
   end
 end
 
---- From the main float (<Tab>): focus the pane if it is open, else open it.
-function M.focus_or_toggle_pins()
+--- Switch focus between the main view and the pinned pane. No-op if the pane is
+--- closed -- opening/closing is `pin_toggle`'s job, not this one's.
+function M.focus_pins()
   local state = M.state
-  if state and state.pin_win and api.nvim_win_is_valid(state.pin_win) then
-    api.nvim_set_current_win(state.pin_win)
-  else
-    M.open_pins()
+  if not state or not (state.pin_win and api.nvim_win_is_valid(state.pin_win)) then
+    return
+  end
+  local cur = api.nvim_get_current_win()
+  local target = (cur == state.pin_win) and state.win or state.pin_win
+  if target and api.nvim_win_is_valid(target) then
+    api.nvim_set_current_win(target)
   end
 end
 

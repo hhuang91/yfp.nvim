@@ -46,26 +46,51 @@ pins.reset()
 
 vim.api.nvim_buf_set_lines(0, 0, -1, false, { "" })
 yfp.open({ cwd = tmp })
--- entries sort dirs-first: row 2 = "sub/", row 3 = "alpha.txt"
+local function pane_open()
+  return exp.state.pin_win and vim.api.nvim_win_is_valid(exp.state.pin_win)
+end
+
+-- P toggles the panel open; focus stays in the main view
+exp.toggle_pins()
+assert(pane_open(), "pinned panel must open")
+assert(vim.api.nvim_get_current_win() == exp.state.win, "opening keeps focus in main")
+
+-- a pins the selection (entries sort dirs-first: row 2 = "sub/", row 3 = "alpha.txt")
 vim.api.nvim_win_set_cursor(exp.state.win, { 2, 0 })
 actions.pin_add()
-assert(#pins.list() == 1, "pin_add must add one pin")
+assert(#pins.list() == 1, "pin_add must add one pin while the panel is open")
 assert(pins.list()[1].path == sub, "must pin the subdir path")
-
-exp.toggle_pins()
-assert(exp.state.pin_win and vim.api.nvim_win_is_valid(exp.state.pin_win), "pinned pane must open")
 local pline = vim.api.nvim_buf_get_lines(exp.state.pin_buf, 0, 1, false)[1]
 assert(not pline:find("\\", 1, true), "pane path must not contain backslashes")
 
+-- <Tab> only switches focus, it does not close the panel
+exp.focus_pins()
+assert(vim.api.nvim_get_current_win() == exp.state.pin_win, "focus_pins enters the panel")
+assert(pane_open(), "focus_pins must not close the panel")
+exp.focus_pins()
+assert(vim.api.nvim_get_current_win() == exp.state.win, "focus_pins toggles back to main")
+
+-- <CR>/l in the panel jumps the main view to the pin, focus returns to main, panel stays open
+vim.api.nvim_set_current_win(exp.state.pin_win)
 vim.api.nvim_win_set_cursor(exp.state.pin_win, { 1, 0 })
 actions.pin_jump()
 assert(exp.state.cwd == sub, "pin_jump must navigate the main view into the pin")
-assert(vim.api.nvim_get_current_win() == exp.state.win, "focus must return to the main float")
+assert(vim.api.nvim_get_current_win() == exp.state.win, "focus returns to main after jump")
+assert(pane_open(), "panel stays open after a jump")
 
+-- d removes the pin under the cursor
 vim.api.nvim_set_current_win(exp.state.pin_win)
 vim.api.nvim_win_set_cursor(exp.state.pin_win, { 1, 0 })
 actions.pin_remove()
 assert(#pins.list() == 0, "pin_remove must empty the list")
+
+-- with the panel closed, a no longer pins (the add is gated). cwd is now the
+-- empty sub/, so the "../" row (line 1) is the only valid cursor target.
+exp.toggle_pins()
+assert(not pane_open(), "P closes the panel")
+vim.api.nvim_win_set_cursor(exp.state.win, { 1, 0 })
+actions.pin_add()
+assert(#pins.list() == 0, "pin_add is a no-op while the panel is closed")
 
 yfp.close()
 assert(not yfp.is_open(), "the whole UI must close cleanly")
@@ -73,6 +98,6 @@ pins.reset()
 assert(#pins.list() == 0, "removal must persist across a reload")
 pcall(vim.fn.delete, pinfile)
 yfp.setup({})
-print("yfp: pinned-pane add/toggle/jump/remove + persistence tests passed")
+print("yfp: pinned-panel toggle/focus/add(gated)/jump/remove + persistence tests passed")
 
 print("yfp: functional yank_and_paste + registers-only tests passed")

@@ -111,10 +111,11 @@ Clone, then point lazy.nvim at the local copy:
 | `~` | Jump to home |
 | `=` | Jump to original working directory |
 | `.` | Toggle hidden files |
-| `<Tab>` | Toggle the **pinned locations** pane (open & focus it, or close it) |
-| `P` | **Pin** the file/folder under the cursor |
-| `x` / `dd` | Remove the pin under the cursor *(inside the pinned pane)* |
-| `<CR>` / `l` | *(in the pinned pane)* jump the main view to that pin |
+| `P` | Toggle the **pinned locations** panel (open / close) |
+| `<Tab>` | Switch focus between the main view and the panel |
+| `a` | **Pin** the item under the cursor *(while the panel is open)* |
+| `d` | Remove the pin under the cursor *(in the panel)* |
+| `<CR>` / `l` | *(in the panel)* jump the main view to that pin |
 | `/` | Fuzzy-filter the current listing *(v1.1)* |
 | `q` / `<Esc>` | Close |
 | `g?` | Help |
@@ -129,13 +130,16 @@ Clone, then point lazy.nvim at the local copy:
 Keep a short list of folders (and files) you reach for often, and jump back to them without
 re-navigating:
 
-1. In the explorer, put the cursor on a file or folder and press **`P`** to pin it. (On the `../`
-   row, `P` pins the current folder.)
-2. Press **`<Tab>`** to open a **pinned** pane along the bottom of the float (and focus it). `<Tab>`
-   again closes it.
-3. In the pane, press **`<CR>`** / **`l`** on a pin to send the main view there — a folder opens, a
-   file opens its folder with the cursor on the file — and focus hops back to the main view (the pane
-   stays open). Press **`x`** (or `dd`) to remove the pin under the cursor.
+1. Press **`P`** to toggle the **pinned** panel along the bottom of the float. `P` both opens it
+   (leaving focus in the main view) and closes it — it's the only key that controls the panel's
+   visibility.
+2. With the panel open, put the cursor on a file or folder in the main view and press **`a`** to pin
+   it (on the `../` row, `a` pins the current folder). Pinning works only while the panel is open.
+3. Press **`<Tab>`** to switch focus between the main view and the panel — it never opens or closes
+   the panel (that's `P`'s job).
+4. In the panel, press **`<CR>`** / **`l`** on a pin to send the main view there — a folder opens, a
+   file opens its folder with the cursor on the file — and focus hops back to the main view (the panel
+   stays open). Press **`d`** to remove the pin under the cursor.
 
 The list is saved to `stdpath("data")/yfp/pins.json` (e.g. `~/AppData/Local/nvim-data/yfp/pins.json`
 on Windows) and reloaded on the next session — it's the **only** file `yfp` ever writes, and it's
@@ -202,9 +206,10 @@ require("yfp").setup({
     filter              = "/",
     close               = { "q", "<Esc>" },
     help                = "g?",
-    pin_toggle          = "<Tab>",        -- main: open/focus the pinned pane; pane: close it
-    pin_add             = "P",            -- main: pin the item under the cursor
-    pin_remove          = { "x", "dd" },  -- pane: remove the pin under the cursor
+    pin_toggle          = "P",      -- toggle the pinned panel open/closed
+    pin_focus           = "<Tab>",  -- switch focus between the main view and the panel
+    pin_add             = "a",      -- pin the item under the cursor (panel must be open)
+    pin_remove          = "d",      -- remove the pin under the cursor (in the panel)
   },
 })
 ```

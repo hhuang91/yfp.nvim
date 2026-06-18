@@ -227,6 +227,13 @@ function M.pin_add()
     notify("pins are disabled (set pins.enabled = true)")
     return
   end
+  -- Adding is only allowed while the pinned panel is open (see DESIGN §7.4).
+  if not (state.pin_win and api.nvim_win_is_valid(state.pin_win)) then
+    local km = config.options.keymaps
+    local k = (type(km.pin_toggle) == "table") and km.pin_toggle[1] or km.pin_toggle
+    notify("open the pinned panel first (" .. tostring(k) .. ")")
+    return
+  end
   local pins = require("yfp.pins")
   local row = exp.current_row()
   local target
@@ -321,9 +328,10 @@ function M.help()
     ("  %-12s list drives (Windows)"):format(f(km.drives)),
     ("  %-12s home / working dir"):format(f(km.home) .. " / " .. f(km.cwd)),
     ("  %-12s toggle hidden"):format(f(km.toggle_hidden)),
-    ("  %-12s pinned pane: focus / close"):format(f(km.pin_toggle)),
-    ("  %-12s pin the item (main view)"):format(f(km.pin_add)),
-    ("  %-12s remove the pin (pinned pane)"):format(f(km.pin_remove)),
+    ("  %-12s toggle the pinned panel"):format(f(km.pin_toggle)),
+    ("  %-12s switch focus: main <-> panel"):format(f(km.pin_focus)),
+    ("  %-12s pin the item (panel must be open)"):format(f(km.pin_add)),
+    ("  %-12s remove the pin (in the panel)"):format(f(km.pin_remove)),
     ("  %-12s close"):format(f(km.close)),
   }
   vim.notify(table.concat(lines, "\n"))

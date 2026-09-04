@@ -210,6 +210,9 @@ end
 - If launched from **insert mode**, optionally `startinsert` afterward (`cfg.yank.keep_insert`).
 - `gy` = pick a path mode via `vim.ui.select`, then yank to registers (the menu form of `y`); `gp` =
   pick a mode, then yank-and-paste (the menu form of `p`). Both route through the same `do_yank`.
+- **Modes:** `absolute`, the four `relative_*` modes, and `filename` — the bare name with no
+  directory (`main.lua`), for when you want the name rather than the location. `filename` is pure
+  string work (`path.basename`), so it needs no `vim.fs.relpath` and can't reintroduce a `\`.
 
 ### 7.4 Pinned locations (a toggleable bottom pane)
 
@@ -309,7 +312,7 @@ require("yfp").setup({
     keep_insert = true,        -- re-enter insert mode if YFP was opened from insert mode
     dir_trailing_slash = false,
     default_mode = "absolute", -- "absolute" | "relative_cwd" | "relative_buffer"
-                               -- | "relative_git" | "relative_custom"
+                               -- | "relative_git" | "relative_custom" | "filename"
   },
 
   source_dir = nil,            -- base for "relative_custom" (also via set_source_dir())
@@ -362,6 +365,7 @@ zero-dependency promise.
 | v1.0 | Read-only float explorer · browse anywhere · `y`=registers / `p`=paste · `/` normalize · drives view | Core. No deps. |
 | ✅ | **Pinned locations** — toggleable bottom panel (`P`), `<Tab>` to focus, `a` to pin / `d` to remove / `<CR>` to jump | §7.4. Persists to `stdpath("data")/yfp/pins.json` (D6). Still no deps. |
 | ✅ | **Open in place** — `o` edits the selected file in the window you launched from | §7.5. Files only; a `:edit` (read), so still read-only by construction (D7). |
+| ✅ | **`filename` mode** — yank/paste the bare name, no directory | §7.3. In the `gy`/`gp` menu and settable as `yank.default_mode`. Pure `path.basename`, no new deps. |
 | v1.1 | **In-float fuzzy filter** (`/`) | "find sprinkled on top." Filters the current dir listing in-place; pure Lua, no deps. |
 | v1.2 | **Relative path modes** + `gy` menu | `relative_cwd` / `relative_buffer` / `relative_git` / `relative_custom`. Uses `vim.fs.relpath` (0.11+) with a manual fallback. This is the user's "advanced" feature. |
 | v1.3 | **Recursive find** | Async `vim.uv` walk under cwd → flat filtered list, still read-only, still `y`. Guard with max depth/results to stay snappy. |

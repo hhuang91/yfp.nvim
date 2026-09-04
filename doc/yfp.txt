@@ -35,7 +35,8 @@ Inside the float (all remappable via the `keymaps` option):
 
     y           yank path to registers only (", +) -- Vim-like
     p           yank AND paste the path at the cursor (also sets registers)
-    gy          yank to registers, choosing a path format (absolute/relative)
+    gy          yank to registers, choosing a path format (absolute /
+                relative / filename)
     gp          yank AND paste, choosing a path format
     <CR> / l    enter directory
     o           open the selected file in the origin window (files only)
@@ -103,7 +104,8 @@ See README.md for the full default table. Highlights:
     yank.separator      "/" (force forward slashes) | "\\" | "os"
     yank.registers      { '"', '+' }: set by both yank actions
     yank.default_mode   "absolute" | "relative_cwd" | "relative_buffer"
-                        | "relative_git" | "relative_custom"
+                        | "relative_git" | "relative_custom" | "filename"
+                        ("filename" = the bare name, no directory: "main.lua")
     pins                pinned-locations pane; see |yfp-pins|
 
 ==============================================================================

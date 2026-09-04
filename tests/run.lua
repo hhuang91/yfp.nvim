@@ -35,6 +35,18 @@ eq(path.parent("/home"), "/", "parent on unix")
 eq(path.is_root("C:/"), true, "drive root is root")
 eq(path.is_root("/"), true, "unix root is root")
 eq(path.is_root("C:/Users"), false, "non-root")
+eq(path.basename("C:/Users/me/f.lua"), "f.lua", "basename of a file")
+eq(path.basename([[C:\Users\me]]), "me", "basename normalizes separators")
+eq(path.basename("C:/Users/me/"), "me", "basename ignores a trailing slash")
+eq(path.basename("/home/me"), "me", "basename on unix")
+eq(path.basename("C:/"), "C:/", "basename of a root is the root itself")
+
+-- path modes (absolute/filename are pure string work -- no vim.fs.relpath needed)
+local ctx = { cwd = "C:/proj" }
+eq(path.transform("C:/proj/src/f.lua", "absolute", ctx), "C:/proj/src/f.lua", "absolute mode")
+eq(path.transform([[C:\proj\src\f.lua]], "filename", ctx), "f.lua", "filename drops the dir")
+eq(path.transform("C:/proj/src", "filename", ctx), "src", "filename mode on a folder")
+eq(path.transform("/home/me/f.lua", "filename", ctx), "f.lua", "filename mode on unix")
 
 -- config merge
 local config = require("yfp.config")

@@ -115,7 +115,8 @@ end
 -- Pick a path format via vim.ui.select, then run the chosen yank (registers
 -- only when insert=false, registers + paste when insert=true).
 local function do_menu(insert)
-  local modes = { "absolute", "relative_cwd", "relative_buffer", "relative_git", "relative_custom" }
+  local modes =
+    { "absolute", "relative_cwd", "relative_buffer", "relative_git", "relative_custom", "filename" }
   local prompt = insert and "yfp: paste path as" or "yfp: yank path as"
   vim.ui.select(modes, { prompt = prompt }, function(choice)
     if choice then

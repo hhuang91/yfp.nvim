@@ -104,7 +104,7 @@ Clone, then point lazy.nvim at the local copy:
 |---|---|
 | `y` | **Yank** path to registers (`"`, `+`) — Vim-style, no paste |
 | `p` | **Yank and paste** the path at your cursor (also sets registers) |
-| `gy` | Pick a path format (absolute / relative…), then **yank** to registers |
+| `gy` | Pick a path format (absolute / relative / filename), then **yank** to registers |
 | `gp` | Pick a path format, then **yank and paste** at the cursor |
 | `<CR>` / `l` | Enter directory |
 | `o` | Open the selected **file** in the window you launched yfp from |
@@ -181,7 +181,7 @@ require("yfp").setup({
     keep_insert = true,        -- re-enter insert mode if opened from insert mode
     dir_trailing_slash = false,
     default_mode = "absolute", -- "absolute" | "relative_cwd" | "relative_buffer"
-                               -- | "relative_git" | "relative_custom"
+                               -- | "relative_git" | "relative_custom" | "filename"
   },
 
   source_dir = nil,            -- base directory for "relative_custom"
@@ -230,6 +230,7 @@ require("yfp").setup({
 | `relative_buffer` | path relative to the file you're editing | v1.2 |
 | `relative_git` | path relative to the nearest `.git` root | v1.2 |
 | `relative_custom` | path relative to `source_dir` / `set_source_dir()` | v1.2 |
+| `filename` | just the name, no directory: `main.lua` | ✅ |
 
 Whatever the mode, the result is **always** run through the separator rule last, so a relative path
 can never sneak a `\` back in.
@@ -301,7 +302,8 @@ it to `{ '"' }` to leave the system clipboard alone, or `{}` so only `p`'s paste
 
 ## Roadmap
 
-- **Recently added** — pinned locations: a toggleable bottom pane, persisted across sessions.
+- **Recently added** — pinned locations (a toggleable bottom pane, persisted across sessions) and the
+  `filename` path mode.
 - **v1.1** — in-float fuzzy filter (`/`) — the "find sprinkled on top."
 - **v1.2** — relative path modes + the `gy` format menu.
 - **v1.3** — recursive find (async, still read-only).

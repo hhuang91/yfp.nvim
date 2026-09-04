@@ -77,6 +77,20 @@ function M.parent(p)
   return parent
 end
 
+--- Last component of a path: the file/folder name, no directory, no trailing
+--- slash ("C:/a/b.lua" -> "b.lua", "C:/a/b/" -> "b"). Roots have no name of
+--- their own, so they are returned unchanged ("C:/" -> "C:/").
+---@param p string
+---@return string
+function M.basename(p)
+  p = M.slashify(p)
+  if M.is_root(p) then
+    return p
+  end
+  local trimmed = (p:gsub("/+$", ""))
+  return trimmed:match("[^/]*$") or trimmed
+end
+
 --- Path of `target` relative to `base` (both absolute). Forward-slash result.
 ---@param target string
 ---@param base string
@@ -117,6 +131,8 @@ function M.transform(abspath, mode, ctx)
     out = M.relative(abspath, root)
   elseif mode == "relative_custom" then
     out = ctx.source_dir and M.relative(abspath, ctx.source_dir) or abspath
+  elseif mode == "filename" then
+    out = M.basename(abspath)
   else
     out = abspath
   end

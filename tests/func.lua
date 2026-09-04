@@ -146,4 +146,24 @@ pcall(vim.fn.delete, pinfile)
 yfp.setup({})
 print("yfp: open-in-origin-window (main + pinned panel) tests passed")
 
+-- 5) the `filename` path mode: the bare name, no directory attached
+yfp.setup({ yank = { registers = { '"' } } })
+vim.fn.setreg('"', "")
+yfp.open({ cwd = tmp })
+local function row_of(name)
+  for i, r in ipairs(exp.state.rows) do
+    if r.kind == "entry" and r.entry.name == name then
+      return i
+    end
+  end
+end
+local alpha_row = row_of("alpha.txt")
+assert(alpha_row, "alpha.txt must be listed")
+vim.api.nvim_win_set_cursor(exp.state.win, { alpha_row, 0 })
+actions.yank("filename")
+print("FILENAME = " .. tostring(vim.fn.getreg('"')))
+assert(vim.fn.getreg('"') == "alpha.txt", "filename mode yanks the bare name, no directory")
+yfp.setup({})
+print("yfp: filename path mode tests passed")
+
 print("yfp: functional yank_and_paste + registers-only tests passed")

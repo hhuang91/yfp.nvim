@@ -108,12 +108,12 @@ Clone, then point lazy.nvim at the local copy:
 | `gp` | Pick a path format, then **yank and paste** at the cursor |
 | `<CR>` / `l` | Enter directory |
 | `o` | Open the selected **file** in the window you launched yfp from |
-| `-` / `h` | Go up (drives view at a drive root) |
+| `-` / `h` | Go up — the cursor lands on the folder you just left (drives view at a drive root) |
 | `<C-g>` | Go to a typed path (any folder / drive / `~`) |
 | `D` | List drives (Windows) |
 | `~` | Jump to home |
 | `=` | Jump to original working directory |
-| `.` | Toggle hidden files |
+| `.` | Toggle hidden files (the cursor stays on the item you had selected) |
 | `P` | Toggle the **pinned locations** panel (open / close) |
 | `<Tab>` | Switch focus between the main view and the panel |
 | `a` | **Pin** the item under the cursor *(while the panel is open)* |
@@ -302,8 +302,9 @@ it to `{ '"' }` to leave the system clipboard alone, or `{}` so only `p`'s paste
 
 ## Roadmap
 
-- **Recently added** — pinned locations (a toggleable bottom pane, persisted across sessions) and the
-  `filename` path mode.
+- **Recently added** — pinned locations (a toggleable bottom pane, persisted across sessions); the
+  `filename` path mode; the cursor now keeps its place — going up lands on the folder you came from,
+  and toggling hidden files keeps your selection.
 - **v1.1** — in-float fuzzy filter (`/`) — the "find sprinkled on top."
 - **v1.2** — relative path modes + the `gy` format menu.
 - **v1.3** — recursive find (async, still read-only).

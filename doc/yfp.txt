@@ -40,12 +40,13 @@ Inside the float (all remappable via the `keymaps` option):
     gp          yank AND paste, choosing a path format
     <CR> / l    enter directory
     o           open the selected file in the origin window (files only)
-    - / h       go up (drives view at a drive root, Windows)
+    - / h       go up; the cursor lands on the folder you just left (drives
+                view at a drive root, Windows)
     <C-g>       go to a typed path (any folder / drive / ~)
     D           list drives (Windows)
     ~           jump to home
     =           jump to the working directory
-    .           toggle hidden files
+    .           toggle hidden files; the cursor stays on the selected item
     P           toggle the pinned-locations panel (open / close)
     <Tab>       switch focus between the main view and the panel
     a           pin the file/folder under the cursor (while the panel is open)

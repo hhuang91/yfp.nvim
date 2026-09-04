@@ -171,11 +171,17 @@ The `../` row is a synthetic pseudo-entry: selecting it goes up; it is **not** y
 
 ### 7.2 Navigate
 - **Enter dir** (`<CR>`/`l`): if entry is a directory → set `cwd`, rescan, re-render, cursor to top.
-- **Up** (`-`/`h`): `cwd = dirname(cwd)`; at a drive root, show the **drives view** instead.
+- **Up** (`-`/`h`): `cwd = dirname(cwd)`; at a drive root, show the **drives view** instead. The
+  cursor lands on the folder you just left (`set_cwd(parent, basename(from))`) rather than the first
+  entry, so hopping between sibling folders doesn't cost you your place; it falls back to the first
+  entry when that name isn't listed (hidden, or renamed since).
 - **Goto** (`<C-g>`): `vim.ui.input` → type any absolute path / `~` / `D:/projects` → normalize → cd.
 - **Drives** (`D`, Windows): probe `A:/`…`Z:/` with `vim.uv.fs_stat`; list the ones that exist.
   (`<C-d>`/`<C-u>` are left unmapped so they keep their native half-page scroll.)
-- **Toggle hidden** (`.`): flip `show_hidden`, rescan view.
+- **Toggle hidden** (`.`): flip `show_hidden`, rescan the view **in place** via `explorer.refresh()`
+  — a refresh, not a move, so the cursor stays on the item it was on while dotfiles appear/disappear
+  around it (and stays on `../` if that's where it was). Falls back to the first entry only when the
+  selected item is gone from the new listing, i.e. you just hid it.
 
 ### 7.3 Yank — `y` (registers) and `p` (registers + paste)
 
@@ -366,6 +372,7 @@ zero-dependency promise.
 | ✅ | **Pinned locations** — toggleable bottom panel (`P`), `<Tab>` to focus, `a` to pin / `d` to remove / `<CR>` to jump | §7.4. Persists to `stdpath("data")/yfp/pins.json` (D6). Still no deps. |
 | ✅ | **Open in place** — `o` edits the selected file in the window you launched from | §7.5. Files only; a `:edit` (read), so still read-only by construction (D7). |
 | ✅ | **`filename` mode** — yank/paste the bare name, no directory | §7.3. In the `gy`/`gp` menu and settable as `yank.default_mode`. Pure `path.basename`, no new deps. |
+| ✅ | **The cursor keeps its place** — going up lands on the folder you came from; toggling hidden files keeps the selection | §7.2. Cursor placement only; falls back to the first entry when that item isn't in the new listing. |
 | v1.1 | **In-float fuzzy filter** (`/`) | "find sprinkled on top." Filters the current dir listing in-place; pure Lua, no deps. |
 | v1.2 | **Relative path modes** + `gy` menu | `relative_cwd` / `relative_buffer` / `relative_git` / `relative_custom`. Uses `vim.fs.relpath` (0.11+) with a manual fallback. This is the user's "advanced" feature. |
 | v1.3 | **Recursive find** | Async `vim.uv` walk under cwd → flat filtered list, still read-only, still `y`. Guard with max depth/results to stay snappy. |

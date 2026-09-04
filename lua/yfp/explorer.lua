@@ -135,17 +135,38 @@ local function place_cursor_first(state)
   pcall(api.nvim_win_set_cursor, state.win, { math.max(target, 1), 0 })
 end
 
--- Put the cursor on the entry named `name` in the main listing (used after
--- jumping to a pinned file so the file itself is highlighted). Falls back to the
--- first entry if it isn't present (e.g. hidden, or removed since pinning).
+-- Put the cursor on the entry named `name` in the main listing: used after
+-- jumping to a pinned file (so the file itself is highlighted) and after going
+-- up (so we land on the folder we came from). Centers the row so the target is
+-- comfortably visible in a long listing. Falls back to the first entry when the
+-- name isn't listed (hidden, or removed/renamed since).
 local function place_cursor_on(state, name)
-  for i, r in ipairs(state.rows) do
-    if r.kind == "entry" and r.entry.name == name then
-      pcall(api.nvim_win_set_cursor, state.win, { i, 0 })
-      return
+  local target
+  if name and name ~= "" then
+    -- Exact match wins; a case-folded one is the fallback, because the cwd
+    -- string's case can differ from the on-disk name on Windows (e.g. after
+    -- `<C-g> c:/users`, or a pin saved with different casing).
+    local lower = name:lower()
+    local folded
+    for i, r in ipairs(state.rows) do
+      if r.kind == "entry" then
+        if r.entry.name == name then
+          target = i
+          break
+        elseif not folded and r.entry.name:lower() == lower then
+          folded = i
+        end
+      end
     end
+    target = target or folded
   end
-  place_cursor_first(state)
+  if not target then
+    return place_cursor_first(state)
+  end
+  pcall(api.nvim_win_set_cursor, state.win, { target, 0 })
+  pcall(api.nvim_win_call, state.win, function()
+    vim.cmd("normal! zz") -- keep the row visible in a long listing
+  end)
 end
 
 local function key_label(k)
@@ -396,6 +417,23 @@ function M.current_pin_row()
   end
   local lnum = api.nvim_win_get_cursor(state.pin_win)[1]
   return (state.pin_rows or {})[lnum], lnum
+end
+
+--- Re-scan and re-render the current directory in place, keeping the cursor on
+--- the item it is on. This is a refresh, not a move (the hidden-files toggle),
+--- so the listing may shift around the selection without losing it; if that item
+--- is gone from the new listing (you just hid it) we fall back to the top.
+function M.refresh()
+  local state = M.state
+  if not state then
+    return
+  end
+  local row, lnum = M.current_row()
+  local name = (row and row.kind == "entry") and row.entry.name or nil
+  M.set_cwd(state.cwd, name)
+  if not name and lnum and state.win and api.nvim_win_is_valid(state.win) then
+    pcall(api.nvim_win_set_cursor, state.win, { lnum, 0 }) -- stay on the "../" row
+  end
 end
 
 --- Re-render the pinned pane if it is currently open (after add/remove).

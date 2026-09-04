@@ -157,9 +157,12 @@ function M.up()
   if not state then
     return
   end
-  local parent = path.parent(state.cwd)
+  local from = state.cwd
+  local parent = path.parent(from)
   if parent then
-    exp.set_cwd(parent)
+    -- Land on the folder we just left rather than the first entry, so hopping
+    -- between sibling folders doesn't mean re-finding your place every time.
+    exp.set_cwd(parent, path.basename(from))
   elseif vim.fn.has("win32") == 1 then
     M.drives()
   else
@@ -213,7 +216,9 @@ function M.toggle_hidden()
     return
   end
   state.show_hidden = not state.show_hidden
-  exp.set_cwd(state.cwd)
+  -- A refresh, not a move: dotfiles appear/disappear around the selection, so
+  -- keep the cursor on whatever it was pointing at instead of jumping to the top.
+  exp.refresh()
   notify("hidden files " .. (state.show_hidden and "shown" or "hidden"))
 end
 
@@ -386,7 +391,7 @@ function M.help()
     ("  %-12s yank AND paste, pick a format"):format(f(km.yank_and_paste_menu)),
     ("  %-12s enter directory"):format(f(km.enter)),
     ("  %-12s open the file (origin window)"):format(f(km.open)),
-    ("  %-12s go up"):format(f(km.up)),
+    ("  %-12s go up (lands on the folder you left)"):format(f(km.up)),
     ("  %-12s go to a typed path"):format(f(km.goto_path)),
     ("  %-12s list drives (Windows)"):format(f(km.drives)),
     ("  %-12s home / working dir"):format(f(km.home) .. " / " .. f(km.cwd)),

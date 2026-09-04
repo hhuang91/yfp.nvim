@@ -166,4 +166,48 @@ assert(vim.fn.getreg('"') == "alpha.txt", "filename mode yanks the bare name, no
 yfp.setup({})
 print("yfp: filename path mode tests passed")
 
+-- 6) the cursor keeps its place: going up, and toggling hidden files
+vim.fn.mkdir(tmp .. "/aaa", "p") -- sorts above "sub", so it isn't where `up` used to land
+vim.fn.writefile({ "h" }, tmp .. "/.hidden.txt") -- sorts above alpha.txt, so the list shifts
+yfp.setup({ yank = { registers = {} }, show_hidden = false })
+
+-- going up lands on the folder we came from, not on the first entry
+yfp.open({ cwd = tmp .. "/sub" })
+actions.up()
+assert(exp.state.cwd == tmp, "up must navigate to the parent")
+local landed = exp.state.rows[vim.api.nvim_win_get_cursor(exp.state.win)[1]]
+assert(landed and landed.kind == "entry", "up must land on a real entry")
+assert(landed.entry.name == "sub", "up lands on the folder we left, got " .. landed.entry.name)
+yfp.close()
+
+-- toggling hidden files keeps the cursor on the selected item
+yfp.open({ cwd = tmp })
+local function name_at_cursor()
+  local r = exp.state.rows[vim.api.nvim_win_get_cursor(exp.state.win)[1]]
+  return r and (r.kind == "entry" and r.entry.name or r.kind) or nil
+end
+local shown_row = row_of("alpha.txt")
+assert(shown_row, "alpha.txt must be listed with hidden files off")
+vim.api.nvim_win_set_cursor(exp.state.win, { shown_row, 0 })
+actions.toggle_hidden() -- now showing .hidden.txt, which sorts above alpha.txt
+assert(exp.state.show_hidden, "toggle_hidden must flip the flag")
+assert(row_of(".hidden.txt"), "the dotfile must now be listed")
+assert(row_of("alpha.txt") == shown_row + 1, "the listing must have shifted under the cursor")
+assert(name_at_cursor() == "alpha.txt", "the cursor follows the item, it does not reset to the top")
+
+-- on the "../" row the cursor stays put too
+vim.api.nvim_win_set_cursor(exp.state.win, { 1, 0 })
+actions.toggle_hidden()
+assert(name_at_cursor() == "up", "toggling on the ../ row keeps the cursor there")
+
+-- selecting the dotfile and hiding it falls back to the top (it is gone)
+actions.toggle_hidden() -- show again
+vim.api.nvim_win_set_cursor(exp.state.win, { row_of(".hidden.txt"), 0 })
+actions.toggle_hidden() -- hide: the selected entry disappears
+assert(not row_of(".hidden.txt"), "the dotfile must be gone")
+assert(name_at_cursor() == exp.state.rows[2].entry.name, "falls back to the first entry")
+yfp.close()
+yfp.setup({})
+print("yfp: cursor-keeps-its-place (up + toggle hidden) tests passed")
+
 print("yfp: functional yank_and_paste + registers-only tests passed")
